@@ -4,32 +4,19 @@
 
 [![CI](https://github.com/utensils/mcp-nixos/actions/workflows/ci.yml/badge.svg)](https://github.com/utensils/mcp-nixos/actions/workflows/ci.yml)
 [![codecov](https://codecov.io/gh/utensils/mcp-nixos/graph/badge.svg?token=kdcbgvq4Bh)](https://codecov.io/gh/utensils/mcp-nixos)
-[![PyPI](https://img.shields.io/pypi/v/mcp-nixos.svg)](https://pypi.org/project/mcp-nixos/)
 [![FlakeHub](https://img.shields.io/endpoint?url=https://flakehub.com/f/utensils/mcp-nixos/badge)](https://flakehub.com/flake/utensils/mcp-nixos)
-[![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
+[![Rust](https://img.shields.io/badge/rust-2024-blue.svg)](https://www.rust-lang.org/)
 ![CodeRabbit Pull Request Reviews](https://img.shields.io/coderabbit/prs/github/utensils/mcp-nixos?utm_source=oss&utm_medium=github&utm_campaign=utensils%2Fmcp-nixos&labelColor=171717&color=FF570A&link=https%3A%2F%2Fcoderabbit.ai&label=CodeRabbit+Reviews)
 [![Built with Claude](https://img.shields.io/badge/Built%20with-Claude-D97757?logo=claude&logoColor=white)](https://claude.ai)
 
 ## Quick Start
 
-**🚨 No Nix/NixOS Required!** Works on any system - Windows, macOS, Linux. You're just querying APIs.
+**🚨 No Nix/NixOS Required!** One binary, no language runtime. You're just querying APIs.
 
-### Option 1: uvx (Recommended)
+MCP-NixOS speaks MCP revision **2026-07-28** over **stdio**: stateless, no `initialize` handshake,
+no sessions. Your client must support that revision.
 
-[![Install MCP Server](https://cursor.com/deeplink/mcp-install-dark.svg)](https://cursor.com/install-mcp?name=nixos&config=eyJjb21tYW5kIjoidXZ4IG1jcC1uaXhvcyJ9)
-
-```json
-{
-  "mcpServers": {
-    "nixos": {
-      "command": "uvx",
-      "args": ["mcp-nixos"]
-    }
-  }
-}
-```
-
-### Option 2: Nix
+### Option 1: Nix
 
 [![Install MCP Server](https://cursor.com/deeplink/mcp-install-dark.svg)](https://cursor.com/install-mcp?name=nixos&config=eyJjb21tYW5kIjoibml4IHJ1biBnaXRodWI6dXRlbnNpbHMvbWNwLW5peG9zIC0tIn0%3D)
 
@@ -44,7 +31,7 @@
 }
 ```
 
-### Option 3: Docker
+### Option 2: Docker
 
 [![Install MCP Server](https://cursor.com/deeplink/mcp-install-dark.svg)](https://cursor.com/install-mcp?name=nixos&config=eyJjb21tYW5kIjoiZG9ja2VyIiwiYXJncyI6WyJydW4iLCItLXJtIiwiLWkiLCJnaGNyLmlvL3V0ZW5zaWxzL21jcC1uaXhvcyJdfQ%3D%3D)
 
@@ -61,34 +48,23 @@
 
 Your AI now has access to real NixOS data instead of making things up. You're welcome.
 
-### Option 4: HTTP (Remote MCP)
-
-FastMCP supports running this server over HTTP at a URL (the MCP endpoint defaults to `/mcp`).
+### Option 3: Cargo
 
 ```bash
-# Run an HTTP MCP server at http://127.0.0.1:8000/mcp
-MCP_NIXOS_TRANSPORT=http MCP_NIXOS_HOST=127.0.0.1 MCP_NIXOS_PORT=8000 mcp-nixos
+cargo install --git https://github.com/utensils/mcp-nixos
 ```
 
-STDIO (default):
-
-```bash
-MCP_NIXOS_TRANSPORT=stdio mcp-nixos
+```json
+{
+  "mcpServers": {
+    "nixos": {
+      "command": "mcp-nixos"
+    }
+  }
+}
 ```
 
-Custom path:
-
-```bash
-MCP_NIXOS_TRANSPORT=http MCP_NIXOS_PATH=/api/mcp mcp-nixos
-```
-
-Stateless HTTP (disables per-client session state):
-
-```bash
-MCP_NIXOS_TRANSPORT=http MCP_NIXOS_STATELESS_HTTP=1 mcp-nixos
-```
-
-### Option 5: Pi Coding Agent
+### Option 4: Pi Coding Agent
 
 [Pi](https://www.npmjs.com/package/@mariozechner/pi-coding-agent) does not speak MCP natively. Two supported paths:
 
@@ -104,15 +80,14 @@ Then add to `~/.pi/agent/mcp.json`:
 {
   "mcpServers": {
     "nixos": {
-      "command": "uvx",
-      "args": ["mcp-nixos"],
+      "command": "mcp-nixos",
       "lifecycle": "lazy"
     }
   }
 }
 ```
 
-**B. Project-local extension (clone + run):** this repo ships `.pi/extensions/mcp-nixos.ts`, auto-loaded when you run `pi` in the cloned repo. Optional: `cd .pi && npm install` for editor type resolution. Pi runs it either way.
+**B. Project-local extension (clone + run):** this repo ships `.pi/extensions/mcp-nixos.ts`, auto-loaded when you run `pi` in the cloned repo. It talks to `target/release/mcp-nixos`, `mcp-nixos` on `PATH`, or `nix run`. Optional: `cd .pi && npm install` for editor type resolution. Pi runs it either way.
 
 ## What Is This?
 
@@ -179,7 +154,7 @@ NVF results use canonical `vim.*` option paths. Queries may also use the shortha
 
 **Examples:**
 
-```python
+```text
 # Search NixOS packages
 nix(action="search", query="firefox", source="nixos", type="packages")
 
@@ -271,13 +246,13 @@ Find historical versions with nixpkgs commit hashes. Output includes:
 - Nixpkgs commit hash for reproducible builds
 - Attribute path for Nix expressions
 
-```python
+```text
 nix_versions(package, version, limit)
 ```
 
 **Examples:**
 
-```python
+```text
 # List recent versions with metadata
 nix_versions(package="python", limit=5)
 
@@ -287,14 +262,10 @@ nix_versions(package="nodejs", version="20.0.0")
 
 ## Installation
 
-**You DON'T need Nix installed.** This runs anywhere Python runs.
+**You DON'T need Nix installed.** The server is a single binary:
 
 ```bash
-# Run directly (no install)
-uvx mcp-nixos
-
-# Or install
-pip install mcp-nixos
+cargo install --git https://github.com/utensils/mcp-nixos
 ```
 
 For Nix users:
@@ -353,22 +324,16 @@ Or use the flake directly with the provided overlay:
 }
 ```
 
-`overlays.default` only adds `pkgs.mcp-nixos`. The package carries its own
-FastMCP 4 / MCP SDK 2 stack (see `nix/fastmcp4.nix`), including a starlette at
-or above the 1.0.1 security floor FastMCP requires, so nothing else in your
-Python package set changes, even on nixpkgs channels that still ship FastMCP 3.
-If you also want `pkgs.python3Packages.fastmcp` itself upgraded set-wide, apply
-`mcp-nixos.overlays.fastmcp4` in addition.
+`overlays.default` only adds `pkgs.mcp-nixos`.
 
 ## Development
 
 ```bash
 nix develop          # Enter dev shell
 nix build            # Build package
-pytest tests/        # Run tests
-ruff check .         # Lint
-ruff format .        # Format
-mypy mcp_nixos/      # Type check
+cargo test           # Run tests (offline)
+cargo clippy         # Lint
+cargo fmt            # Format
 ```
 
 ## Acknowledgments

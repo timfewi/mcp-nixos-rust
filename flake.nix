@@ -18,66 +18,35 @@
       ...
     }:
     let
-      # Python package-set extension that provides fastmcp 4 / mcp 2 on
-      # nixpkgs revisions that still ship older releases (see nix/fastmcp4.nix).
-      fastmcp4Extension = import ./nix/fastmcp4.nix { inherit (nixpkgs) lib; };
-
       mkMcpNixos =
-        {
-          pkgs,
-          python3Packages ? pkgs.python3Packages,
-        }:
+        { pkgs }:
         let
-          pyproject = pkgs.lib.importTOML ./pyproject.toml;
-          # Scope the fastmcp 4 upgrade to this package so consumers get a
-          # working mcp-nixos without having to upgrade `mcp`/`fastmcp` in
-          # their whole Python package set. The extension is a no-op when the
-          # given set already carries fastmcp >= 4.
-          pythonPackages = python3Packages.overrideScope fastmcp4Extension;
+          manifest = pkgs.lib.importTOML ./Cargo.toml;
         in
-        pythonPackages.buildPythonApplication {
-          pname = pyproject.project.name;
-          inherit (pyproject.project) version;
-          pyproject = true;
+        pkgs.rustPlatform.buildRustPackage {
+          pname = manifest.package.name;
+          inherit (manifest.package) version;
           src = pkgs.lib.fileset.toSource {
             root = ./.;
             fileset = pkgs.lib.fileset.unions [
-              ./pyproject.toml
+              ./Cargo.toml
+              ./Cargo.lock
               ./README.md
-              ./LICENSE
-              ./RELEASE_NOTES.md
-              ./mcp_nixos
+              ./src
               ./tests
             ];
           };
+          cargoLock.lockFile = ./Cargo.lock;
 
-          build-system = [ pythonPackages.hatchling ];
-          dependencies = with pythonPackages; [
-            fastmcp
-            requests
-            beautifulsoup4
+          # aws-lc-sys (the rustls crypto provider) builds its C sources with these.
+          nativeBuildInputs = [
+            pkgs.cmake
+            pkgs.perl
           ];
-
-          pythonRelaxDeps = true;
-          doCheck = true;
-          nativeCheckInputs = with pythonPackages; [
-            pytest
-            pytest-asyncio
-            pytest-cov
-            pytest-rerunfailures
-          ];
-          checkPhase = ''
-            pytest tests/ -m unit
-          '';
-          dontCheckRuntimeDeps = true;
-          pythonImportsCheck = [ "mcp_nixos" ];
-
-          # Expose the scoped package set so consumers (and the flake's own
-          # checks) can inspect the exact fastmcp/mcp the binary runs on.
-          passthru = { inherit pythonPackages; };
+          dontUseCmakeConfigure = true;
 
           meta = {
-            inherit (pyproject.project) description;
+            inherit (manifest.package) description;
             homepage = "https://github.com/utensils/mcp-nixos";
             license = pkgs.lib.licenses.mit;
             mainProgram = "mcp-nixos";
@@ -96,28 +65,8 @@
       ];
 
       flake = {
-        # Upgrade the whole Python package set to fastmcp 4 / mcp 2 when the
-        # consumer's nixpkgs still ships an older release. Only needed if you
-        # want `pkgs.python3Packages.fastmcp` itself to be 4.x; `mcp-nixos`
-        # below already builds against a scoped copy of this upgrade. Note
-        # that this also replaces `python3Packages.mcp` (1.x -> 2.x, a major
-        # API break) set-wide, so other packages depending on `mcp` may break.
-        overlays.fastmcp4 = _final: prev: {
-          pythonPackagesExtensions = prev.pythonPackagesExtensions ++ [ fastmcp4Extension ];
-        };
-
-        # Deprecated alias kept so existing `overlays.fastmcp3` references keep
-        # evaluating. It now applies the fastmcp 4 upgrade above, with the
-        # same set-wide `mcp` replacement, so warn loudly.
-        overlays.fastmcp3 = nixpkgs.lib.warn ''
-          mcp-nixos: overlays.fastmcp3 is deprecated. Use overlays.default for
-          pkgs.mcp-nixos (self-contained), or overlays.fastmcp4 if you really
-          want python3Packages.fastmcp and mcp upgraded set-wide.
-        '' self.overlays.fastmcp4;
-
         # Downstream consumers who apply `mcp-nixos.overlays.default` get
-        # `pkgs.mcp-nixos`. It carries its own fastmcp 4 stack, so nothing
-        # else in the consumer's Python package set is touched.
+        # `pkgs.mcp-nixos`.
         overlays.default = final: _: {
           mcp-nixos = mkMcpNixos { pkgs = final; };
         };
@@ -128,44 +77,10 @@
       perSystem =
         { system, ... }:
         let
-          pkgs = import nixpkgs {
-            inherit system;
-            overlays = [ self.overlays.fastmcp4 ];
-          };
-
-          # One unified Python environment with app runtime deps, dev tools,
-          # and type stubs all sharing a single site-packages. Without this,
-          # each `python3Packages.*` is its own isolated env so `mypy` can't
-          # see `types-requests` and `python -m build` fails with "No module
-          # named build" — which is how the old mkShell + inputsFrom setup
-          # silently passed: the propagated env leaked in. numtide/devshell
-          # is stricter, so we build the env explicitly.
-          pythonEnv = pkgs.python3.withPackages (
-            ps: with ps; [
-              # app runtime
-              fastmcp
-              requests
-              beautifulsoup4
-              # build
-              hatchling
-              build
-              twine
-              # lint / type-check
-              ruff
-              mypy
-              types-requests
-              types-beautifulsoup4
-              # test
-              pytest
-              pytest-asyncio
-              pytest-cov
-              pytest-rerunfailures
-              pytest-xdist
-            ]
-          );
+          pkgs = import nixpkgs { inherit system; };
 
           # Shared docs/website commands — available in both the default and
-          # `web` devshells so you can pick the right weight class (full Python
+          # `web` devshells so you can pick the right weight class (full Rust
           # + docs vs docs-only).
           docsCommands = [
             {
@@ -215,41 +130,6 @@
           ];
         in
         {
-          # Guards nix/fastmcp4.nix: fail loudly if the package this flake builds,
-          # the overlay-applied package set, or the consumer path (a vanilla
-          # nixpkgs with only `overlays.default`) fell back to fastmcp < 4 or to a
-          # starlette below the CVE-2026-48710 floor. The consumer path is what
-          # downstream flakes get, and `packages.mcp-nixos` above cannot cover it
-          # because `pkgs` there already carries `overlays.fastmcp4`.
-          checks.fastmcp4-overlay =
-            let
-              inherit (pkgs) lib;
-              scoped = self.packages.${system}.mcp-nixos.pythonPackages.fastmcp.version;
-              global = pkgs.python3Packages.fastmcp.version;
-              bare = import nixpkgs { inherit system; };
-              vanilla = import nixpkgs {
-                inherit system;
-                overlays = [ self.overlays.default ];
-              };
-              consumer = vanilla.mcp-nixos;
-              consumerFastmcp = consumer.pythonPackages.fastmcp.version;
-              consumerStarlette = consumer.pythonPackages.starlette.version;
-              ok = v: lib.versionAtLeast v "4";
-            in
-            assert lib.assertMsg (ok scoped) "mcp-nixos builds against fastmcp ${scoped}, expected >= 4";
-            assert lib.assertMsg (ok global) "overlays.fastmcp4 yielded fastmcp ${global}, expected >= 4";
-            assert lib.assertMsg (ok consumerFastmcp)
-              "overlays.default builds mcp-nixos against fastmcp ${consumerFastmcp}, expected >= 4";
-            assert lib.assertMsg (lib.versionAtLeast consumerStarlette "1.0.1")
-              "overlays.default builds mcp-nixos against starlette ${consumerStarlette}, expected >= 1.0.1";
-            assert lib.assertMsg (
-              vanilla.python3Packages.fastmcp.drvPath == bare.python3Packages.fastmcp.drvPath
-            ) "overlays.default must not replace python3Packages.fastmcp in the consumer's package set";
-            pkgs.runCommand "fastmcp4-overlay-check" { inherit consumer; } ''
-              echo "fastmcp ${scoped} (scoped), ${global} (overlay), ${consumerFastmcp} (consumer via $consumer)" > $out
-              echo "starlette ${consumerStarlette} (consumer)" >> $out
-            '';
-
           packages = rec {
             mcp-nixos = mkMcpNixos { inherit pkgs; };
             default = mcp-nixos;
@@ -287,7 +167,7 @@
 
           formatter = pkgs.nixfmt-rfc-style;
 
-          # Default dev shell — Python backend + docs tooling in one place.
+          # Default dev shell — Rust backend + docs tooling in one place.
           # Enter with: `nix develop`
           devshells.default = {
             name = "mcp-nixos";
@@ -298,7 +178,13 @@
             '';
 
             packages = [
-              pythonEnv
+              pkgs.cargo
+              pkgs.rustc
+              pkgs.rustfmt
+              pkgs.clippy
+              pkgs.rust-analyzer
+              pkgs.cmake
+              pkgs.perl
               pkgs.nodejs_22
               pkgs.git
               pkgs.gh
@@ -312,72 +198,42 @@
                 category = "run";
                 name = "run";
                 help = "start the MCP server over STDIO";
-                command = "mcp-nixos \"$@\"";
-              }
-              {
-                category = "run";
-                name = "run-http";
-                help = "start the MCP server over HTTP (http://127.0.0.1:8000/mcp)";
-                command = ''
-                  MCP_NIXOS_TRANSPORT=http \
-                    MCP_NIXOS_HOST="''${MCP_NIXOS_HOST:-127.0.0.1}" \
-                    MCP_NIXOS_PORT="''${MCP_NIXOS_PORT:-8000}" \
-                    mcp-nixos "$@"
-                '';
+                command = "cd \"$PRJ_ROOT\" && cargo run --release -- \"$@\"";
               }
 
               # ── checks / tests ─────────────────────────────────────────────
               {
                 category = "check";
                 name = "run-tests";
-                help = "pytest tests/ -n auto (matches CI)";
-                command = "cd \"$PRJ_ROOT\" && pytest tests/ -v -n auto --cov=mcp_nixos \"$@\"";
-              }
-              {
-                category = "check";
-                name = "test-unit";
-                help = "run unit tests only (fast, offline)";
-                command = "cd \"$PRJ_ROOT\" && pytest tests/ -m unit \"$@\"";
-              }
-              {
-                category = "check";
-                name = "test-integration";
-                help = "run integration tests (hits real APIs)";
-                command = "cd \"$PRJ_ROOT\" && pytest tests/ -m integration \"$@\"";
+                help = "cargo test (offline; matches CI)";
+                command = "cd \"$PRJ_ROOT\" && cargo test \"$@\"";
               }
               {
                 category = "check";
                 name = "lint";
-                help = "ruff check + format check (matches CI)";
+                help = "clippy + rustfmt check (matches CI)";
                 command = ''
                   cd "$PRJ_ROOT"
-                  ruff check mcp_nixos/ tests/
-                  ruff format --check mcp_nixos/ tests/
+                  cargo clippy --all-targets -- -D warnings
+                  cargo fmt --check
                 '';
               }
               {
                 category = "check";
                 name = "format";
-                help = "ruff format mcp_nixos/ tests/";
-                command = "cd \"$PRJ_ROOT\" && ruff format mcp_nixos/ tests/";
-              }
-              {
-                category = "check";
-                name = "typecheck";
-                help = "mypy mcp_nixos/";
-                command = "cd \"$PRJ_ROOT\" && mypy mcp_nixos/";
+                help = "cargo fmt";
+                command = "cd \"$PRJ_ROOT\" && cargo fmt";
               }
               {
                 category = "check";
                 name = "ci-local";
-                help = "run the same sequence CI runs: lint, typecheck, tests";
+                help = "run the same sequence CI runs: lint, tests";
                 command = ''
                   set -euo pipefail
                   cd "$PRJ_ROOT"
-                  ruff check mcp_nixos/ tests/
-                  ruff format --check mcp_nixos/ tests/
-                  mypy mcp_nixos/
-                  pytest tests/ -v -n auto --cov=mcp_nixos
+                  cargo clippy --all-targets -- -D warnings
+                  cargo fmt --check
+                  cargo test
                 '';
               }
 
@@ -385,18 +241,8 @@
               {
                 category = "build";
                 name = "build";
-                help = "build the Python wheel + sdist into dist/";
-                # --no-isolation: use the hatchling pinned by this flake instead of
-                # letting `build` fetch the newest one from PyPI. Recent hatchling
-                # releases emit Metadata-Version 2.5, which `twine check` — and
-                # PyPI's upload API — still reject.
-                command = "cd \"$PRJ_ROOT\" && python -m build --no-isolation \"$@\"";
-              }
-              {
-                category = "build";
-                name = "build-check";
-                help = "twine check — validate package metadata";
-                command = "cd \"$PRJ_ROOT\" && twine check dist/*";
+                help = "cargo build --release";
+                command = "cd \"$PRJ_ROOT\" && cargo build --release \"$@\"";
               }
               {
                 category = "build";

@@ -52,7 +52,6 @@ export default defineConfig({
         text: 'Resources',
         items: [
           { text: 'GitHub', link: 'https://github.com/utensils/mcp-nixos' },
-          { text: 'PyPI', link: 'https://pypi.org/project/mcp-nixos/' },
           { text: 'FlakeHub', link: 'https://flakehub.com/flake/utensils/mcp-nixos' },
           { text: 'Docker Hub', link: 'https://hub.docker.com/r/utensils/mcp-nixos' },
         ],
@@ -65,12 +64,11 @@ export default defineConfig({
           text: 'Usage',
           items: [
             { text: 'Pick Your Poison', link: '/usage#pick-your-poison' },
-            { text: 'uvx (Recommended)', link: '/usage#option-1-uvx' },
-            { text: 'Nix', link: '/usage#option-2-nix' },
+            { text: 'Nix', link: '/usage#option-1-nix' },
             { text: 'Declarative Nix', link: '/usage#option-2b-declarative-nix' },
-            { text: 'Docker', link: '/usage#option-3-docker' },
-            { text: 'HTTP Transport', link: '/usage#option-4-http-transport' },
-            { text: 'Pi Coding Agent', link: '/usage#option-5-pi-coding-agent' },
+            { text: 'Docker', link: '/usage#option-2-docker' },
+            { text: 'Cargo', link: '/usage#option-3-cargo' },
+            { text: 'Pi Coding Agent', link: '/usage#option-4-pi-coding-agent' },
           ],
         },
         {

@@ -7,35 +7,19 @@ description: How to run MCP-NixOS in your MCP client of choice.
 
 ## Pick Your Poison
 
-We've got five ways to run this thing. They all do the same thing, so just pick based on
-what tools you already have installed. Or try all five. We don't judge.
+We've got four ways to run this thing. They all do the same thing, so just pick based on
+what tools you already have installed. Or try all four. We don't judge.
 
 ::: tip No Nix Required
-This tool works on any system — Windows, macOS, Linux. You're just querying web APIs.
-Yes, even you, Windows users.
+This tool is a single binary. You're just querying web APIs.
 :::
 
-### Option 1: uvx {#option-1-uvx}
+::: warning Protocol
+MCP-NixOS speaks MCP revision 2026-07-28 over stdio: stateless, no handshake, no sessions.
+Your client must support that revision.
+:::
 
-<UsageOption title="Recommended for most humans" note="Pro tip: this installs nothing permanently. It's like a one-night stand with software.">
-
-The civilized approach. If you've got Python and can install things like a normal person,
-this is for you.
-
-```json
-{
-  "mcpServers": {
-    "nixos": {
-      "command": "uvx",
-      "args": ["mcp-nixos"]
-    }
-  }
-}
-```
-
-</UsageOption>
-
-### Option 2: Nix {#option-2-nix}
+### Option 1: Nix {#option-1-nix}
 
 <UsageOption title="For the enlightened" alt note="Bonus: this method makes you feel superior at developer meetups.">
 
@@ -87,17 +71,13 @@ Or consume the flake directly via the provided overlay:
 }
 ```
 
-`overlays.default` only adds `pkgs.mcp-nixos`. The package brings its own FastMCP 4 /
-MCP SDK 2 stack (including a starlette at or above the 1.0.1 security floor), so nothing
-else in your Python package set changes, even on nixpkgs channels that still ship
-FastMCP 3. Want `pkgs.python3Packages.fastmcp` upgraded set-wide too? Add
-`mcp-nixos.overlays.fastmcp4` as well.
+`overlays.default` only adds `pkgs.mcp-nixos`.
 
 </UsageOption>
 
-### Option 3: Docker {#option-3-docker}
+### Option 2: Docker {#option-2-docker}
 
-<UsageOption title="Container enthusiasts unite" note="May consume 500MB of disk for a 10MB Python script. But hey, it's &quot;isolated&quot;!">
+<UsageOption title="Container enthusiasts unite" note="A container for one small binary. But hey, it's &quot;isolated&quot;!">
 
 Because why install software directly when you can wrap it in 17 layers of abstraction?
 At least it's reproducible. Probably.
@@ -120,31 +100,27 @@ Multi-arch images (amd64 + arm64) on both GHCR and Docker Hub:
 
 </UsageOption>
 
-### Option 4: HTTP Transport (Remote MCP) {#option-4-http-transport}
+### Option 3: Cargo {#option-3-cargo}
 
-<UsageOption title="For grown-up deployments" alt note="Defaults to 127.0.0.1:8000/mcp. Works with any MCP client that speaks HTTP.">
-
-Run the server over HTTP instead of STDIO. Great for shared setups, remote hosts, or when
-you want one server instance serving multiple clients like a responsible adult.
+<UsageOption title="For Rust people" alt note="One binary, no runtime, no virtualenv archaeology.">
 
 ```bash
-# Start with defaults: http://127.0.0.1:8000/mcp
-MCP_NIXOS_TRANSPORT=http mcp-nixos
+cargo install --git https://github.com/utensils/mcp-nixos
+```
 
-# Custom host, port, and path
-MCP_NIXOS_TRANSPORT=http \
-  MCP_NIXOS_HOST=0.0.0.0 \
-  MCP_NIXOS_PORT=9090 \
-  MCP_NIXOS_PATH=/api/mcp \
-  mcp-nixos
-
-# Stateless mode — no per-client sessions
-MCP_NIXOS_TRANSPORT=http MCP_NIXOS_STATELESS_HTTP=1 mcp-nixos
+```json
+{
+  "mcpServers": {
+    "nixos": {
+      "command": "mcp-nixos"
+    }
+  }
+}
 ```
 
 </UsageOption>
 
-### Option 5: Pi Coding Agent {#option-5-pi-coding-agent}
+### Option 4: Pi Coding Agent {#option-4-pi-coding-agent}
 
 <UsageOption title="For Pi users" note="Pi doesn't speak MCP natively, so we meet it halfway.">
 
@@ -163,8 +139,7 @@ Then add to `~/.pi/agent/mcp.json`:
 {
   "mcpServers": {
     "nixos": {
-      "command": "uvx",
-      "args": ["mcp-nixos"],
+      "command": "mcp-nixos",
       "lifecycle": "lazy"
     }
   }
@@ -223,7 +198,7 @@ NVF returns canonical `vim.*` option paths. It also accepts the shorthand
 
 #### Examples
 
-```python
+```text
 # Search NixOS packages
 nix(action="search", query="firefox", source="nixos", type="packages")
 
@@ -281,11 +256,11 @@ Historical package versions with nixpkgs commit hashes. Output includes:
 - nixpkgs commit hash for reproducible builds
 - Attribute path for Nix expressions
 
-```python
+```text
 nix_versions(package, version, limit)
 ```
 
-```python
+```text
 # List recent versions with metadata
 nix_versions(package="python", limit=5)
 
@@ -299,7 +274,7 @@ Two crowd-pleasers worth calling out separately.
 
 **Check the binary cache before you commit to a three-hour build:**
 
-```python
+```text
 # Is hello cached?
 nix(action="cache", query="hello")
 
@@ -314,7 +289,7 @@ Shows download size, unpacked size, compression method, and availability per pla
 
 **Grab rich metadata from NixHub.io:**
 
-```python
+```text
 # Search packages with metadata
 nix(action="search", source="nixhub", query="nodejs")
 
@@ -326,12 +301,7 @@ nix(action="info", source="nixhub", query="python")
 
 | Variable | Purpose | Default |
 |----------|---------|---------|
-| `MCP_NIXOS_TRANSPORT` | `stdio` or `http` | `stdio` |
-| `MCP_NIXOS_HOST` | HTTP bind address | `127.0.0.1` |
-| `MCP_NIXOS_PORT` | HTTP bind port | `8000` |
-| `MCP_NIXOS_PATH` | HTTP MCP endpoint path | `/mcp` |
-| `MCP_NIXOS_STATELESS_HTTP` | Set to `1` to disable per-client session state | unset |
-| `ELASTICSEARCH_URL` | Override the NixOS search backend (for local testing) | unset |
+| `MCP_NIXOS_UPSTREAM` | Redirect all upstream traffic to `<url>/<host>/<path>` (for offline testing) | unset |
 
 ## What Happens Next? {#what-happens-next}
 

@@ -8,43 +8,7 @@ import { fileURLToPath } from "node:url";
 const extensionDir = dirname(fileURLToPath(import.meta.url));
 const projectRoot = resolve(extensionDir, "../..");
 
-const PYTHON_SCRIPT = String.raw`
-import asyncio
-import json
-import os
-import sys
-
-from mcp_nixos.server import nix, nix_versions
-
-
-def _callable(tool):
-    # FastMCP 2.x wrapped @mcp.tool() functions as FunctionTool (not directly callable);
-    # FastMCP 3.x and later keep them as plain async functions. Support both.
-    return getattr(tool, "fn", tool)
-
-
-async def main() -> None:
-    tool = os.environ["PI_NIXOS_TOOL"]
-    args = json.loads(os.environ["PI_NIXOS_ARGS"])
-
-    if tool == "nix":
-        result = await _callable(nix)(**args)
-    elif tool == "nix_versions":
-        result = await _callable(nix_versions)(**args)
-    else:
-        raise ValueError(f"Unknown tool: {tool}")
-
-    sys.stdout.write(result)
-
-
-asyncio.run(main())
-`;
-
-interface CommandResult {
-	code: number | null;
-	stdout: string;
-	stderr: string;
-}
+const PROTOCOL_VERSION = "2026-07-28";
 
 class CancelledError extends Error {
 	constructor() {
@@ -53,79 +17,97 @@ class CancelledError extends Error {
 	}
 }
 
-async function runCommand(
+/**
+ * One stateless MCP tools/call over stdio: start the server, send a
+ * self-describing request, read its single response line, close stdin.
+ */
+async function callServer(
 	command: string,
-	args: string[],
-	env: NodeJS.ProcessEnv,
+	commandArgs: string[],
+	tool: string,
+	args: unknown,
 	signal?: AbortSignal,
-): Promise<CommandResult> {
+): Promise<string> {
 	if (signal?.aborted) throw new CancelledError();
 
 	return new Promise((resolvePromise, reject) => {
-		const child = spawn(command, args, {
-			cwd: projectRoot,
-			env,
-			stdio: ["ignore", "pipe", "pipe"],
-		});
+		const child = spawn(command, commandArgs, { cwd: projectRoot, stdio: ["pipe", "pipe", "pipe"] });
 
 		let stdout = "";
 		let stderr = "";
+		let settled = false;
+		const settle = (finish: () => void) => {
+			if (settled) return;
+			settled = true;
+			signal?.removeEventListener("abort", onAbort);
+			finish();
+		};
+		const onAbort = () => {
+			child.kill("SIGTERM");
+			settle(() => reject(new CancelledError()));
+		};
+		if (signal) signal.addEventListener("abort", onAbort, { once: true });
 
 		child.stdout.on("data", (chunk) => {
 			stdout += String(chunk);
+			const newline = stdout.indexOf("\n");
+			if (newline === -1) return;
+			child.stdin.end();
+			try {
+				const reply = JSON.parse(stdout.slice(0, newline));
+				if (reply.error) throw new Error(reply.error.message);
+				const text = reply.result.content.map((block: { text?: string }) => block.text ?? "").join("");
+				settle(() => resolvePromise(text));
+			} catch (error) {
+				settle(() => reject(error));
+			}
 		});
 		child.stderr.on("data", (chunk) => {
 			stderr += String(chunk);
 		});
-
-		const onAbort = () => {
-			child.kill("SIGTERM");
-			reject(new CancelledError());
-		};
-		if (signal) signal.addEventListener("abort", onAbort, { once: true });
-
-		child.on("error", (err) => {
-			signal?.removeEventListener("abort", onAbort);
-			reject(err);
+		child.stdin.on("error", () => {
+			// The close handler below reports a server that exited early.
 		});
+		child.on("error", (err) => settle(() => reject(err)));
 		child.on("close", (code) => {
-			signal?.removeEventListener("abort", onAbort);
-			resolvePromise({ code, stdout, stderr });
+			settle(() => reject(new Error(`${command} exited with ${code}: ${stderr.trim()}`)));
 		});
+
+		const request = {
+			jsonrpc: "2.0",
+			id: 1,
+			method: "tools/call",
+			params: {
+				name: tool,
+				arguments: args,
+				_meta: {
+					"io.modelcontextprotocol/protocolVersion": PROTOCOL_VERSION,
+					"io.modelcontextprotocol/clientInfo": { name: "pi-mcp-nixos", version: "1" },
+					"io.modelcontextprotocol/clientCapabilities": {},
+				},
+			},
+		};
+		child.stdin.write(`${JSON.stringify(request)}\n`);
 	});
 }
 
 async function runNixosTool(tool: "nix" | "nix_versions", args: unknown, signal?: AbortSignal): Promise<string> {
-	const env: NodeJS.ProcessEnv = {
-		...process.env,
-		PI_NIXOS_TOOL: tool,
-		PI_NIXOS_ARGS: JSON.stringify(args),
-	};
-	delete env.PYTHONPATH;
-	delete env.PYTHONHOME;
-	delete env.__PYVENV_LAUNCHER__;
-
 	const candidates: Array<{ command: string; args: string[] }> = [];
-	const venvPython = resolve(projectRoot, ".venv/bin/python");
-	if (existsSync(venvPython)) {
-		candidates.push({ command: venvPython, args: ["-c", PYTHON_SCRIPT] });
+	for (const profile of ["release", "debug"]) {
+		const binary = resolve(projectRoot, "target", profile, "mcp-nixos");
+		if (existsSync(binary)) candidates.push({ command: binary, args: [] });
 	}
 	candidates.push(
-		{ command: "uv", args: ["run", "python", "-c", PYTHON_SCRIPT] },
-		{ command: "python3", args: ["-c", PYTHON_SCRIPT] },
-		{ command: "python", args: ["-c", PYTHON_SCRIPT] },
+		{ command: "mcp-nixos", args: [] },
+		{ command: "nix", args: ["run", ".#mcp-nixos"] },
 	);
 
 	const errors: string[] = [];
 	for (const candidate of candidates) {
 		try {
-			const result = await runCommand(candidate.command, candidate.args, env, signal);
-			if (result.code === 0) {
-				return result.stdout.trimEnd();
-			}
-			errors.push(`${candidate.command} exited with ${result.code}: ${(result.stderr || result.stdout).trim()}`);
+			return (await callServer(candidate.command, candidate.args, tool, args, signal)).trimEnd();
 		} catch (error) {
-			// Cancellation stops retries — don't spawn more Python processes after abort.
+			// Cancellation stops retries — don't spawn more servers after abort.
 			if (error instanceof CancelledError || signal?.aborted) {
 				throw error instanceof CancelledError ? error : new CancelledError();
 			}
@@ -137,7 +119,7 @@ async function runNixosTool(tool: "nix" | "nix_versions", args: unknown, signal?
 	throw new Error(
 		[
 			"Failed to run mcp-nixos from pi.",
-			"Tried .venv/bin/python, uv, python3, and python in the repository root.",
+			"Tried target/{release,debug}/mcp-nixos, mcp-nixos on PATH, and nix run.",
 			...errors,
 		].join("\n"),
 	);
@@ -240,14 +222,14 @@ const nixTool = defineTool({
 	parameters: nixToolParams,
 	async execute(_toolCallId: string, params: NixToolParams, signal: AbortSignal | undefined) {
 		// Legacy alias: older model sessions may still emit action=options.
-		// server.py also normalizes this, but translating here keeps details.args honest.
+		// The server also normalizes this, but translating here keeps details.args honest.
 		const action = params.action === "options" ? "browse" : params.action;
 
 		// Only forward keys the caller actually set. Passing empty-string defaults would
 		// (a) echo noisy args back in details.args, contradicting the "omit optional
 		// parameters" guidance in the tool description, and (b) train small models to
-		// copy those empties into future calls. The Python server already supplies its
-		// own sensible defaults when a key is omitted.
+		// copy those empties into future calls. The server already supplies its own
+		// sensible defaults when a key is omitted.
 		const normalized: Record<string, string | number> = { action };
 		if (params.query !== undefined) normalized.query = params.query;
 		if (params.source !== undefined) normalized.source = params.source;

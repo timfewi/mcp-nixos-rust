@@ -67,15 +67,8 @@ jobs:
 
     - name: Test package runs
       run: |
-        timeout 5s ./result/bin/mcp-nixos --help || true
+        ./result/bin/mcp-nixos --version
 
-    - name: Build Python distribution
-      run: |
-        nix develop --command python -m build --no-isolation
-        ls -la dist/
-
-    - name: Validate package metadata
-      run: nix develop --command twine check dist/*
 
   lint:
     runs-on: ubuntu-latest
@@ -91,13 +84,11 @@ jobs:
           experimental-features = nix-command flakes
           accept-flake-config = true
 
-    - name: Lint with ruff
-      run: |
-        nix develop --command ruff check mcp_nixos/ tests/
-        nix develop --command ruff format --check mcp_nixos/ tests/
+    - name: Lint with clippy
+      run: nix develop --command cargo clippy --all-targets -- -D warnings
 
-    - name: Type check with mypy
-      run: nix develop --command mypy mcp_nixos/
+    - name: Check formatting
+      run: nix develop --command cargo fmt --check
 
   test:
     runs-on: ubuntu-latest
@@ -115,18 +106,7 @@ jobs:
 
     - name: Run tests
       timeout-minutes: 10
-      run: |
-        nix develop --command pytest tests/ -v -n auto --cov=mcp_nixos --cov-report=xml --cov-report=term
-
-    - name: Upload coverage to Codecov
-      uses: codecov/codecov-action@v6
-      with:
-        token: ${{ secrets.CODECOV_TOKEN }}
-        slug: utensils/mcp-nixos
-        files: ./coverage.xml
-        flags: unittests
-        name: codecov-umbrella
-        fail_ci_if_error: false
+      run: nix develop --command cargo test
 
   # Verify the release image still builds on both supported Linux architectures.
   docker-build:

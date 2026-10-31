@@ -10,9 +10,9 @@ Releases are managed by Release Please. Do not edit the version, create a tag, o
 ## How it works
 
 1. Conventional commits merged to `main` update the open `release: vX.Y.Z` PR.
-2. The release PR updates `pyproject.toml`, `.release-please-manifest.json`, and `RELEASE_NOTES.md`.
+2. The release PR updates `Cargo.toml`, `Cargo.lock`, `.release-please-manifest.json`, and `RELEASE_NOTES.md`.
 3. Merging that PR makes Release Please create the matching tag and GitHub Release.
-4. The resulting `release.published` event runs the existing trusted-publisher workflow, which publishes PyPI, Docker Hub, GHCR, and FlakeHub artifacts from that exact tag.
+4. The resulting `release.published` event runs the existing trusted-publisher workflow, which publishes Docker Hub, GHCR, and FlakeHub artifacts from that exact tag.
 5. `ci.yml` only validates builds; it does not publish rolling container images.
 
 Version rules:
@@ -36,7 +36,7 @@ Confirm that:
 
 - the proposed SemVer bump matches every included change;
 - `RELEASE_NOTES.md` is complete and calls out breaking changes;
-- `pyproject.toml` and `.release-please-manifest.json` contain the same version;
+- `Cargo.toml`, `Cargo.lock` and `.release-please-manifest.json` contain the same version;
 - CI and review are green.
 
 For the first automated release, verify that the migration merge commit's one-time `Release-As: 3.0.0` footer was honored. This major bump is required because Intel macOS flake outputs were removed.
@@ -59,14 +59,14 @@ gh run watch <PUBLISH_RUN_ID>
 gh run view <RUN_ID> --log-failed
 ```
 
-If PyPI/Docker or FlakeHub fails after the tag exists, fix the cause and rerun only the relevant recovery workflow with the immutable release tag:
+If Docker or FlakeHub fails after the tag exists, fix the cause and rerun only the relevant recovery workflow with the immutable release tag:
 
 ```bash
 gh workflow run publish.yml -f tag=vX.Y.Z -f docker_only=true
 gh workflow run deploy-flakehub.yml -f tag=vX.Y.Z
 ```
 
-Manual package recovery republishes only the immutable version tag by default. Add `-f update_aliases=true` only when recovering the current latest release after verifying that moving `latest`, major, and minor aliases forward is correct. The manual package workflow intentionally cannot publish PyPI. A failed PyPI upload must be retried from the failed job in the original `Publish Package` run after confirming that no partial version exists.
+Manual package recovery republishes only the immutable version tag by default. Add `-f update_aliases=true` only when recovering the current latest release after verifying that moving `latest`, major, and minor aliases forward is correct.
 
 ### 4. Independently verify public artifacts
 
@@ -74,8 +74,6 @@ Manual package recovery republishes only the immutable version tag by default. A
 VERSION=X.Y.Z
 
 gh release view "v$VERSION" --json tagName,isDraft,isPrerelease,publishedAt,url,targetCommitish
-curl --fail --silent "https://pypi.org/pypi/mcp-nixos/$VERSION/json" | jq -r .info.version
-uvx "mcp-nixos@$VERSION" --help
 
 docker buildx imagetools inspect "utensils/mcp-nixos:$VERSION"
 docker buildx imagetools inspect "ghcr.io/utensils/mcp-nixos:$VERSION"
@@ -86,7 +84,7 @@ curl --fail --silent https://api.flakehub.com/f/utensils/mcp-nixos \
 nix flake metadata "https://flakehub.com/f/utensils/mcp-nixos/$VERSION"
 ```
 
-Verify that the tag and GitHub Release target the release PR merge commit, PyPI reports the exact version, both container manifests contain `linux/amd64` and `linux/arm64`, the container starts, and FlakeHub reports the exact version.
+Verify that the tag and GitHub Release target the release PR merge commit, both container manifests contain `linux/amd64` and `linux/arm64`, the container starts, and FlakeHub reports the exact version.
 
 ## Guardrails
 

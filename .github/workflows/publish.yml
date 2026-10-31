@@ -51,10 +51,10 @@ jobs:
           fi
 
           VERSION="${RELEASE_TAG#v}"
-          PROJECT_VERSION=$(python3 -c 'import tomllib; print(tomllib.load(open("pyproject.toml", "rb"))["project"]["version"])')
+          PROJECT_VERSION=$(python3 -c 'import tomllib; print(tomllib.load(open("Cargo.toml", "rb"))["package"]["version"])')
           MANIFEST_VERSION=$(python3 -c 'import json; print(json.load(open(".release-please-manifest.json"))["."])')
           if [[ "$PROJECT_VERSION" != "$VERSION" ]]; then
-            echo "Tag $RELEASE_TAG does not match pyproject.toml version $PROJECT_VERSION"
+            echo "Tag $RELEASE_TAG does not match Cargo.toml version $PROJECT_VERSION"
             exit 1
           fi
           if [[ "$MANIFEST_VERSION" != "$VERSION" ]]; then
@@ -85,33 +85,11 @@ jobs:
             experimental-features = nix-command flakes
             accept-flake-config = true
 
-      - name: Build Python package
-        run: |
-          nix develop --command python -m build --no-isolation
-          nix develop --command twine check dist/*
+      - name: Build Nix package
+        run: nix build
 
-      - name: Upload build artifacts
-        uses: actions/upload-artifact@v7
-        with:
-          name: dist-${{ needs.validate.outputs.version }}
-          path: dist/
-
-  deploy-pypi:
-    needs: [validate, build]
-    if: ${{ github.event_name == 'release' && !github.event.release.prerelease }}
-    runs-on: ubuntu-latest
-    environment: pypi
-    permissions:
-      id-token: write
-    steps:
-      - name: Download build artifacts
-        uses: actions/download-artifact@v8
-        with:
-          name: dist-${{ needs.validate.outputs.version }}
-          path: dist/
-
-      - name: Publish to PyPI
-        uses: pypa/gh-action-pypi-publish@release/v1
+      - name: Test package runs
+        run: ./result/bin/mcp-nixos --version
 
   docker-build:
     needs: [validate, build]
@@ -227,11 +205,11 @@ jobs:
       tag: ${{ github.event.release.tag_name }}
 
   verify-release:
-    needs: [validate, deploy-pypi, docker-manifest, publish-flakehub]
+    needs: [validate, docker-manifest, publish-flakehub]
     if: ${{ github.event_name == 'release' && !github.event.release.prerelease }}
     runs-on: ubuntu-latest
     steps:
-      - name: Verify public PyPI and container artifacts
+      - name: Verify public container artifacts
         env:
           VERSION: ${{ needs.validate.outputs.version }}
         run: |
@@ -242,10 +220,6 @@ jobs:
               and ($platforms | index("linux/arm64")) != null
             ' >/dev/null
           }
-
-          curl --fail --location --retry 12 --retry-all-errors --retry-delay 10 \
-            "https://pypi.org/pypi/mcp-nixos/$VERSION/json" \
-            | jq --exit-status --arg version "$VERSION" '.info.version == $version' >/dev/null
 
           docker buildx imagetools inspect --raw "utensils/mcp-nixos:$VERSION" \
             | verify_platforms

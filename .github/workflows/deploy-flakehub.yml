@@ -37,9 +37,9 @@ jobs:
           fi
 
           VERSION="${RELEASE_TAG#v}"
-          PROJECT_VERSION=$(python3 -c 'import tomllib; print(tomllib.load(open("pyproject.toml", "rb"))["project"]["version"])')
+          PROJECT_VERSION=$(python3 -c 'import tomllib; print(tomllib.load(open("Cargo.toml", "rb"))["package"]["version"])')
           if [[ "$PROJECT_VERSION" != "$VERSION" ]]; then
-            echo "Tag $RELEASE_TAG does not match pyproject.toml version $PROJECT_VERSION"
+            echo "Tag $RELEASE_TAG does not match Cargo.toml version $PROJECT_VERSION"
             exit 1
           fi
 

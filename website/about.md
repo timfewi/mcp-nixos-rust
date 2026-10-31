@@ -39,8 +39,8 @@ and utilities for developers and systems engineers.
 
 ## Architecture
 
-MCP-NixOS v3.x is a **stateless, async FastMCP 4.x server** with a modular structure
-(Python 3.11+). No persistent caches, no databases, no sacred goat to appease — live
+MCP-NixOS is a **stateless Rust server** on the official `rmcp` SDK, speaking MCP revision
+2026-07-28 over stdio. No persistent caches, no databases, no sacred goat to appease — live
 APIs are the source of truth, with some in-process caching for discovered channels
 and catalogue-style sources (Home Manager, nix-darwin, Nixvim, NVF, Noogle, nix.dev) so
 a single server run doesn't re-fetch the same catalog on every query.
@@ -54,10 +54,10 @@ a single server run doesn't re-fetch the same catalog on every query.
   catalogue into plain-text records.
 - **Plain-text formatter** — All responses are rendered as human-readable text for
   optimal LLM consumption. No XML. No JSON leaking into prompts.
-- **Async everywhere** — Every blocking HTTP or file I/O call is wrapped in
-  `asyncio.to_thread()` to keep the event loop humming.
+- **Async everywhere** — HTTP runs on Tokio; parsing and file I/O run off the async
+  workers. Cancelled requests stop their upstream work.
 
-Modules live under `mcp_nixos/sources/` with one file per data source, so adding a new
+Modules live under `src/sources/` with one file per data source, so adding a new
 backend is a small, bounded change.
 
 ## Features
@@ -156,8 +156,7 @@ entire thing would have been done in two days and would be 100% better.
 
 MCP-NixOS is open-source and welcomes contributions. Fork the repository, create a
 feature branch, and open a pull request against `main`. CI runs automatically on every
-PR — flake check, Nix build, Python distribution build, `twine check`, linting, type
-checking, and tests.
+PR — flake check, Nix build, clippy, rustfmt, and tests.
 
 <div style="display: flex; flex-wrap: wrap; gap: 0.75rem; margin: 1.5rem 0;">
 

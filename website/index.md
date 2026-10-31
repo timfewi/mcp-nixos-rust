@@ -76,8 +76,8 @@ Paste this into your MCP client config. Congratulations, you now have access to 
 {
   "mcpServers": {
     "nixos": {
-      "command": "uvx",
-      "args": ["mcp-nixos"]
+      "command": "nix",
+      "args": ["run", "github:utensils/mcp-nixos", "--"]
     }
   }
 }

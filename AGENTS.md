@@ -8,36 +8,38 @@ MCP-NixOS is a Model Context Protocol (MCP) server that provides accurate, real-
 
 ## Project Structure & Module Organization
 
-- `mcp_nixos/` - Contains the MCP server implementation.
-  - `mcp_nixos/server.py` - MCP tools, tool routing, and main entry point.
-  - `mcp_nixos/config.py` - Configuration constants (API URLs, auth, limits).
-  - `mcp_nixos/caches.py` - Process-local cache implementations (channels, nixvim, NVF, noogle, nix.dev).
-  - `mcp_nixos/utils.py` - Shared utility functions (HTML parsing, formatting, file I/O).
-  - `mcp_nixos/sources/` - Data source implementations (one module per source):
-    - `base.py` - Channel helpers, Elasticsearch queries, browsing utilities.
-    - `nixos.py` - NixOS packages/options search, info, stats.
-    - `home_manager.py` - Home Manager options.
-    - `darwin.py` - nix-darwin options.
-    - `flakes.py` - Flake search from search.nixos.org.
-    - `flakehub.py` - FlakeHub API (Determinate Systems).
-    - `wiki.py` - NixOS Wiki search.
-    - `nixdev.py` - nix.dev documentation.
-    - `nixvim.py` - Nixvim options.
-    - `nvf.py` - NVF options, path normalization, and query actions.
-    - `noogle.py` - Noogle function search.
-    - `nixhub.py` - NixHub API + binary cache status.
-    - `flake_inputs.py` - Local flake inputs via nix store.
-- `tests/` - Holds pytest unit and integration tests; markers live in `pytest.ini` and `tests/conftest.py`.
+- `src/` - The MCP server (library plus `mcp-nixos` binary).
+  - `src/main.rs` - Entry point; serves stdio until stdin closes.
+  - `src/server.rs` - MCP surface: tool definitions, routing, protocol versions, cancellation.
+  - `src/config.rs` - Configuration constants (API URLs, auth, limits).
+  - `src/http.rs` - Bounded upstream HTTP: size cap, timeouts, TLS roots, `requests`-style status errors.
+  - `src/caches.rs` - Process-local caches (channels, Home Manager, nix-darwin, Nixvim, NVF, Noogle, nix.dev).
+  - `src/html.rs` - HTML text extraction and option catalogue parsing.
+  - `src/text.rs` - Plain-text formatting helpers.
+  - `src/nix_schema.json`, `src/nix_versions_schema.json`, `src/nix_tool.md`, `src/instructions.md` - The tool surface as data.
+  - `src/sources/` - Data source implementations (one module per source):
+    - `base.rs` - Channel helpers, Elasticsearch queries, HTML option search/info/stats/browse (Home Manager, nix-darwin).
+    - `nixos.rs` - NixOS packages/options search, info, stats.
+    - `flakes.rs` - Flake search from search.nixos.org.
+    - `flakehub.rs` - FlakeHub API (Determinate Systems).
+    - `wiki.rs` - NixOS Wiki search.
+    - `nixdev.rs` - nix.dev documentation.
+    - `nixvim.rs` - Nixvim options.
+    - `nvf.rs` - NVF options and path normalization.
+    - `noogle.rs` - Noogle function search.
+    - `nixhub.rs` - NixHub API + binary cache status.
+    - `flake_inputs.rs` - Local flake inputs via `nix flake archive`.
+    - `store.rs` - Direct `/nix/store` ls/read.
+- `tests/` - Offline integration tests. `common/mod.rs` is an HTTP fixture standing in for every upstream; `channels.rs` and `sources.rs` drive the tools, `protocol.rs` drives the real binary over stdio. Unit tests sit next to the code.
 - `website/` - The VitePress docs/marketing site (`index.md`, `usage.md`, `about.md`, custom theme under `.vitepress/`); static assets live in `website/public/`. Output builds to `website/out/` and deploys to S3/CloudFront via `deploy-website.yml`.
-- `.pi/` - Pi Coding Agent extension that wraps the MCP tools as native Pi tools (Pi does not speak MCP). `extensions/mcp-nixos.ts` spawns a Python subprocess that imports `mcp_nixos.server` and calls the tool functions directly — not part of the MCP server runtime, only relevant when running `pi` in this repo.
-- `flake.nix` - Defines the Nix dev shell, package, overlays, and checks.
-- `nix/` - Python package-set extension that vendors the FastMCP 4 / MCP SDK 2 stack (`fastmcp4.nix` plus one pure-Python wheel derivation per package, e.g. `fastmcp.nix`, `mcp.nix`, `starlette.nix`) for nixpkgs pins that still ship older releases. `flake.nix` applies it scoped to `pkgs.mcp-nixos` via `overrideScope`, and exports it set-wide as `overlays.fastmcp4`.
-- `pyproject.toml` - Defines Python packaging and dependencies.
-- `dist/`, `htmlcov/`, and `result/` are generated artifacts; do not edit by hand.
+- `.pi/` - Pi Coding Agent extension that wraps the MCP tools as native Pi tools (Pi does not speak MCP). `extensions/mcp-nixos.ts` spawns the server and makes one stateless `tools/call` per invocation; only relevant when running `pi` in this repo.
+- `flake.nix` - Defines the Nix dev shell, package, overlay, and checks.
+- `Cargo.toml` - Defines Rust packaging and dependencies.
+- `target/` and `result/` are generated artifacts; do not edit by hand.
 
 ## Key Architecture
 
-The project is a FastMCP 4.x server (async) with a modular structure (Python 3.11+). The server is organized into focused modules: `server.py` handles MCP tools and routing, `sources/` contains per-source implementations, `config.py` defines constants, `caches.py` manages cached data, and `utils.py` provides shared utilities.
+The project is an async Rust server on the official `rmcp` SDK, speaking MCP revision **2026-07-28** over **stdio only**. `server.rs` handles the protocol surface and routing, `sources/` contains per-source implementations, `http.rs` is the single path to upstreams, and `caches.rs` manages cached data.
 
 Only **2 MCP tools** are exposed (consolidated from 17 in v1.0):
 - `nix` - Unified query tool for search/info/stats/browse/channels/flake-inputs/cache/store across all sources. `options` is accepted as a silent alias for `browse` (legacy).
@@ -60,79 +62,38 @@ All responses are formatted as plain text for optimal LLM consumption.
 
 ## Build, Test, and Development Commands
 
-This project uses Nix flakes exclusively for development and building.
-
-### With Nix Development Shell (Recommended)
-
 ```bash
-# Enter dev shell (auto-activates Python venv)
+# Enter dev shell
 nix develop
 
 # Core commands (available via menu):
 run           # Start the MCP server
-run-tests     # Run all tests (with coverage in CI)
-lint          # Check code with ruff
-format        # Format code with ruff
-typecheck     # Run mypy type checker
-build         # Build the package/distributions
-```
-
-### Python-only Development
-
-```bash
-# Install with development dependencies
-uv pip install -e ".[dev]"  # or pip install -e ".[dev]"
-
-# Run server
-uv run mcp-nixos  # or python -m mcp_nixos.server
-```
-
-### Transports (STDIO vs HTTP)
-
-By default the server runs over STDIO (for local MCP clients). The latest versions also support an HTTP transport (Remote MCP) using FastMCP.
-
-```bash
-# STDIO (default)
-MCP_NIXOS_TRANSPORT=stdio mcp-nixos
-
-# HTTP (default endpoint: http://127.0.0.1:8000/mcp)
-MCP_NIXOS_TRANSPORT=http MCP_NIXOS_HOST=127.0.0.1 MCP_NIXOS_PORT=8000 mcp-nixos
-
-# Custom path
-MCP_NIXOS_TRANSPORT=http MCP_NIXOS_PATH=/api/mcp mcp-nixos
-
-# Stateless HTTP (disables per-client session state)
-MCP_NIXOS_TRANSPORT=http MCP_NIXOS_STATELESS_HTTP=1 mcp-nixos
+run-tests     # cargo test (offline)
+lint          # clippy and rustfmt check
+format        # cargo fmt
+ci-local      # lint plus tests, as CI runs them
+build         # cargo build --release
+build-nix     # nix build, including the test suite
 ```
 
 ## Testing Guidelines
 
-- Pytest with `pytest-asyncio` (auto mode enabled, function-scoped event loops); async tests are standard.
-- Mark tests with `@pytest.mark.unit` or `@pytest.mark.integration`.
-- Integration tests hit real APIs (no mocks).
-- Coverage is enabled by default (`--cov=mcp_nixos`).
-- For flaky integration tests, use `@pytest.mark.flaky(reruns=3)`.
+- `cargo test` is fully offline: upstreams are replaced with `tests/common/mod.rs` through `MCP_NIXOS_UPSTREAM`.
+- Add a regression test next to the code for pure logic, in `tests/sources.rs` or `tests/channels.rs` for source behavior, and in `tests/protocol.rs` for anything a client can observe on the wire.
 - Tests ensure plain text output (no XML/JSON leakage).
 
-### Running Specific Tests
-
 ```bash
-# Run a single test file
-pytest tests/test_server.py
-
-# Run a single test function
-pytest tests/test_server.py::test_nixos_search -v
-
-# Run tests matching a pattern
-pytest tests/ -k "nixos" -v
+cargo test --test sources                 # One test file
+cargo test noogle                         # Tests matching a pattern
 ```
 
 ## Coding Style & Naming Conventions
 
-- Python 3.11+; 4-space indentation; max line length 120 (ruff enforces).
-- Use `snake_case` for functions/vars, `PascalCase` for classes; tests named `test_*.py`.
+- Rust 2024; max line width 120 (`rustfmt.toml`).
+- `unsafe` is forbidden in this crate. `unwrap` is denied in library code; static patterns use `expect` with a local `allow`.
 - Keep MCP responses plain text (no raw JSON) to match server behavior.
-- **Never bypass linting**: Do not use `# noqa`, `# type: ignore`, `# pylint: disable`, or similar comments to suppress linter/type checker warnings. Fix the underlying issue instead. If a lint rule is genuinely wrong for the project, update the ruff/mypy configuration in `pyproject.toml`.
+- Tool output is a compatibility surface: lengths count characters, not bytes, and case-insensitive ordering uses full case folding (`text::casefold`).
+- **Never bypass linting**: Do not use `#[allow]` to silence a lint you could fix. If a lint is genuinely wrong for the project, change `[lints]` in `Cargo.toml`.
 
 ## Installation & Configuration
 
@@ -170,27 +131,23 @@ pytest tests/ -k "nixos" -v
 
 ## Important Implementation Notes
 
-1. **Channel Resolution**: The server dynamically discovers available NixOS channels on startup. "stable" always maps to the current stable release.
+1. **Channel Resolution**: The server dynamically discovers available NixOS channels. "stable" always maps to the current stable release. Fallback mappings are never memoized.
 2. **Error Handling**: All tools return helpful plain text error messages. API failures gracefully degrade.
-3. **Process-local Caching**: There is no persistent cache or database. Catalogue-style sources such as Home Manager, nix-darwin, Nixvim, NVF, Noogle, and nix.dev are cached in memory for the lifetime of the server process; other queries hit live APIs.
-4. **Async Everything**: Version 1.0.1 migrated to FastMCP (currently FastMCP 4.x on MCP SDK 2.x, which speaks protocol revision 2026-07-28; `fastmcp>=4.0.0` in `pyproject.toml`). All tools are async functions. All blocking HTTP calls and file I/O are wrapped in `asyncio.to_thread()` to prevent blocking the event loop.
+3. **Process-local Caching**: There is no persistent cache or database. Catalogue-style sources such as Home Manager, nix-darwin, Nixvim, NVF, Noogle, and nix.dev are cached in memory for the lifetime of the server process; other queries hit live APIs. These hold upstream data, never client state.
+4. **Stateless Protocol**: Only revision 2026-07-28 is supported. There is no `initialize` handshake: `initialize` is rejected with `-32022` naming the supported versions. To serve a legacy client, add its version to `SUPPORTED_VERSIONS` in `server.rs`.
 5. **Plain Text Output**: All responses are formatted as human-readable plain text. Never return raw JSON or XML to users.
-6. **Environment Variables**:
-   - `ELASTICSEARCH_URL` overrides the NixOS search backend for local testing.
-   - `MCP_NIXOS_TRANSPORT` selects transport: `stdio` (default) or `http`.
-   - `MCP_NIXOS_HOST` configures the HTTP bind address (default: `127.0.0.1`).
-   - `MCP_NIXOS_PORT` configures the HTTP bind port (default: `8000`).
-   - `MCP_NIXOS_PATH` configures the HTTP MCP endpoint path (default: `/mcp`); must be an absolute non-empty path.
-   - `MCP_NIXOS_STATELESS_HTTP=1` disables per-client session state for HTTP.
-7. **Flake Inputs**: The `flake-inputs` action requires nix to be installed locally. It uses `nix flake archive --json` to discover inputs and their store paths, with security validation to ensure paths stay within `/nix/store/`.
-8. **Binary Cache Status**: The `cache` action queries cache.nixos.org to check if packages have pre-built binaries. It uses NixHub to resolve package versions to store paths, then checks narinfo availability.
-9. **NixHub Source**: The `nixhub` source provides rich package metadata including license, homepage, programs, and store paths via the search.devbox.sh API.
-10. **NVF Source**: The `nvf` source tracks NVF's latest published unstable options. Its canonical names are `vim.*`; callers may also use `programs.nvf.vim.*` or `programs.nvf.settings.vim.*`, which normalize to the canonical path before search, info, or browse operations.
+6. **Bounded Work**: Response bodies are capped in `http.rs`. Tool calls run in their own task, so `notifications/cancelled` aborts in-flight HTTP and `nix` children. HTML parsing and file I/O run off the async workers.
+7. **Environment Variables**: `MCP_NIXOS_UPSTREAM` redirects all upstream traffic to `<url>/<host>/<path>`, for offline testing.
+8. **TLS Roots**: System CAs are preferred; a bundled Mozilla set is the fallback when the host has none.
+9. **Flake Inputs**: The `flake-inputs` action requires nix to be installed locally. It uses `nix flake archive --json` to discover inputs and their store paths, with security validation to ensure paths stay within `/nix/store/`.
+10. **Binary Cache Status**: The `cache` action queries cache.nixos.org to check if packages have pre-built binaries. It uses NixHub to resolve package versions to store paths, then checks narinfo availability.
+11. **NixHub Source**: The `nixhub` source provides rich package metadata including license, homepage, programs, and store paths via the search.devbox.sh API.
+12. **NVF Source**: The `nvf` source tracks NVF's latest published unstable options. Its canonical names are `vim.*`; callers may also use `programs.nvf.vim.*` or `programs.nvf.settings.vim.*`, which normalize to the canonical path before search, info, or browse operations.
 
 ## Commit, PR, & Release Guidelines
 
 - Commit messages follow `type: summary` (e.g., `feat:`, `fix:`, `docs:`, `refactor:`, `test:`, `chore:`).
-- **CI**: Runs on all PRs - flake check, Nix build, Python distribution build, package validation (twine), linting, type checking, tests.
-- **Publish**: Release Please creates tags and GitHub Releases; the authenticated release event then publishes PyPI, multi-arch Docker images to GHCR and Docker Hub, and the tagged flake to FlakeHub.
+- **CI**: Runs on all PRs - flake check, Nix build, clippy, rustfmt, tests.
+- **Publish**: Release Please creates tags and GitHub Releases; the authenticated release event then publishes multi-arch Docker images to GHCR and Docker Hub, and the tagged flake to FlakeHub.
 - **Release Process**: Use the `/release` command to review and merge the generated `release: vX.Y.Z` PR and verify every public registry. Do not bump versions or create tags manually.
-- Release PRs update `pyproject.toml`, `.release-please-manifest.json`, and `RELEASE_NOTES.md`; their squash merge message is `release: vX.Y.Z`.
+- Release PRs update `Cargo.toml`, `Cargo.lock`, `.release-please-manifest.json`, and `RELEASE_NOTES.md`; their squash merge message is `release: vX.Y.Z`.

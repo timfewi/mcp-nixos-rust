@@ -49,90 +49,35 @@ You should be used when there are needs to:
 {
   description = "MCP server development environment";
 
-  inputs = {
-    nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
-    flake-utils.url = "github:numtide/flake-utils";
-  };
+  inputs.nixpkgs.url = "https://channels.nixos.org/nixos-unstable/nixexprs.tar.zst";
 
-  outputs = { self, nixpkgs, flake-utils }:
-    flake-utils.lib.eachDefaultSystem (system:
-      let
-        pkgs = nixpkgs.legacyPackages.${system};
-        python = pkgs.python311;
-      in
-      {
-        devShells.default = pkgs.mkShell {
-          buildInputs = with pkgs; [
-            python
-            python.pkgs.pip
-            python.pkgs.uv
-            ruff
-            mypy
-          ];
+  outputs = { self, nixpkgs }:
+    let
+      pkgs = nixpkgs.legacyPackages.x86_64-linux;
+    in
+    {
+      packages.x86_64-linux.default = pkgs.rustPlatform.buildRustPackage {
+        pname = "mcp-nixos";
+        version = "0.1.0";
+        src = ./.;
+        cargoLock.lockFile = ./Cargo.lock;
+      };
 
-          shellHook = ''
-            # Activate Python virtual environment
-            if [ ! -d .venv ]; then
-              ${python.pkgs.uv}/bin/uv venv
-            fi
-            source .venv/bin/activate
-            
-            # Install project dependencies
-            ${python.pkgs.uv}/bin/uv pip install -e ".[dev]"
-            
-            # Custom development commands
-            alias run='${python.pkgs.uv}/bin/uv run mcp-nixos'
-            alias run-tests='${pkgs.python311Packages.pytest}/bin/pytest tests/'
-            alias lint='${pkgs.ruff}/bin/ruff check mcp_nixos/ tests/'
-            alias format='${pkgs.ruff}/bin/ruff format mcp_nixos/ tests/'
-            alias typecheck='${pkgs.mypy}/bin/mypy mcp_nixos/'
-            alias build='${python.pkgs.uv}/bin/uv build'
-            
-            echo "Development environment ready!"
-            echo "Available commands: run, run-tests, lint, format, typecheck, build"
-          '';
-        };
-
-        packages.default = python.pkgs.buildPythonApplication {
-          pname = "mcp-nixos";
-          version = "1.0.1";
-          src = ./.;
-          
-          propagatedBuildInputs = with python.pkgs; [
-            fastmcp
-            requests
-            beautifulsoup4
-          ];
-          
-          doCheck = true;
-          checkInputs = with python.pkgs; [
-            pytest
-            pytest-asyncio
-          ];
-        };
-      });
+      devShells.x86_64-linux.default = pkgs.mkShell {
+        packages = with pkgs; [ cargo rustc rustfmt clippy rust-analyzer ];
+      };
+    };
 }
 ```
 
 ## Common NIX Patterns:
 
-### Package Override:
-```nix
-# Override a package
-python311 = pkgs.python311.override {
-  packageOverrides = self: super: {
-    fastmcp = super.fastmcp.overridePythonAttrs (oldAttrs: {
-      version = "2.11.0";
-    });
-  };
-};
-```
-
 ### Development Scripts:
 ```nix
 # Custom scripts in development shell
-writeShellScriptBin "run-integration-tests" ''
-  pytest tests/ --integration
+writeShellScriptBin "ci-local" ''
+  cargo clippy --all-targets -- -D warnings
+  cargo test
 ''
 ```
 
@@ -140,9 +85,7 @@ writeShellScriptBin "run-integration-tests" ''
 ```nix
 # Platform-specific dependencies
 buildInputs = with pkgs; [
-  python311
-] ++ lib.optionals stdenv.isDarwin [
-  darwin.apple_sdk.frameworks.Foundation
+  openssl
 ] ++ lib.optionals stdenv.isLinux [
   pkg-config
 ];
@@ -153,7 +96,7 @@ buildInputs = with pkgs; [
 1. **Flake Issues**: Use `nix flake check` to validate flake syntax
 2. **Build Failures**: Check `nix log` for detailed error messages
 3. **Environment Problems**: Clear with `nix-collect-garbage` and rebuild
-4. **Cache Issues**: Use `--no-build-isolation` for Python packages
+4. **Cargo Hashes**: `cargoLock.lockFile` avoids `cargoHash` churn when `Cargo.lock` changes
 5. **Version Conflicts**: Pin specific nixpkgs commits in flake inputs
 
 Focus on modern NIX patterns with flakes, reproducible development environments, and efficient developer workflows.

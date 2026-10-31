@@ -1,0 +1,46 @@
+[package]
+name = "mcp-nixos"
+version = "3.1.0"
+edition = "2024"
+rust-version = "1.90"
+description = "Model Context Protocol server for NixOS, Home Manager, and nix-darwin resources"
+license = "MIT"
+repository = "https://github.com/timfewi/mcp-nixos-rust"
+readme = "README.md"
+
+[lib]
+name = "mcp_nixos"
+path = "src/lib.rs"
+
+[[bin]]
+name = "mcp-nixos"
+path = "src/main.rs"
+
+[dependencies]
+caseless = "0.2"
+chrono = { version = "0.4", default-features = false, features = ["std", "clock"] }
+futures = { version = "0.3", default-features = false, features = ["std"] }
+indexmap = "2"
+percent-encoding = "2"
+regex = "1"
+reqwest = { version = "0.13", default-features = false, features = ["rustls", "gzip", "json", "query"] }
+rmcp = { version = "=3.8.0", default-features = false, features = ["server", "transport-io"] }
+scraper = { version = "0.27", default-features = false }
+ego-tree = "0.11"
+serde = { version = "1", features = ["derive"] }
+serde_json = { version = "1", features = ["preserve_order"] }
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "io-std", "process", "sync", "time"] }
+webpki-root-certs = "1"
+
+[lints.rust]
+unsafe_code = "forbid"
+
+[lints.clippy]
+unwrap_used = "deny"
+expect_used = "warn"
+
+[profile.release]
+opt-level = 3
+lto = "thin"
+codegen-units = 1
+strip = true

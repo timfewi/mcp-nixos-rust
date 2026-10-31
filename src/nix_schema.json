@@ -1,0 +1,48 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "action": {
+      "description": "One of: search, info, stats, browse, channels, flake-inputs, cache, store. Use 'search' for keyword lookup, 'info' for details about a specific name, 'browse' to walk an option hierarchy by prefix (home-manager/darwin/nixvim/nvf/noogle only; 'options' is accepted as a legacy alias). 'store' reads files or lists directories at an explicit /nix/store/ path.",
+      "type": "string"
+    },
+    "query": {
+      "default": "",
+      "description": "Search term for 'search', exact name for 'info', prefix path for 'browse'. For flake-inputs: input_name or input:path. For store: absolute /nix/store/ path. Leave empty for 'stats'/'channels'.",
+      "type": "string"
+    },
+    "source": {
+      "default": "nixos",
+      "description": "Data source for search/info/stats/browse/cache. One of: nixos (default), home-manager, darwin, flakes, flakehub, nixvim, nvf, wiki, nix-dev, noogle, nixhub. For action=flake-inputs, this may instead be a path to a flake directory; omit/default to use the current project. Ignored by action=store.",
+      "type": "string"
+    },
+    "type": {
+      "default": "packages",
+      "description": "Sub-type of query. For source=nixos with action=search, one of: packages, options, programs, flakes. For source=nixos with action=info, one of: package, option. For flake-inputs, one of: list, ls, read. For store, one of: ls, read. Ignored by most other sources.",
+      "type": "string"
+    },
+    "channel": {
+      "default": "unstable",
+      "description": "NixOS channel: unstable (default), stable, or a release like 25.05.",
+      "type": "string"
+    },
+    "limit": {
+      "default": 20,
+      "description": "Max results. 1-100 (or 1-2000 for flake-inputs/store read).",
+      "type": "integer"
+    },
+    "version": {
+      "default": "latest",
+      "description": "Only used by action=cache. Package version (default: latest).",
+      "type": "string"
+    },
+    "system": {
+      "default": "",
+      "description": "Only used by action=cache. System arch e.g. x86_64-linux. Empty for all.",
+      "type": "string"
+    }
+  },
+  "required": [
+    "action"
+  ]
+}

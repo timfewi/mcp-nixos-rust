@@ -18,7 +18,7 @@ CloudFront.
 From the repo root, drop into one of the dev shells:
 
 ```bash
-# Full shell (Python backend + docs toolchain — recommended if you work across both)
+# Full shell (Rust backend + docs toolchain — recommended if you work across both)
 nix develop
 
 # Docs-only shell (Node + VitePress helpers, lighter)

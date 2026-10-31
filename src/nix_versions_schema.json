@@ -1,0 +1,23 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "package": {
+      "description": "Package name",
+      "type": "string"
+    },
+    "version": {
+      "default": "",
+      "description": "Specific version to find",
+      "type": "string"
+    },
+    "limit": {
+      "default": 10,
+      "description": "1-50",
+      "type": "integer"
+    }
+  },
+  "required": [
+    "package"
+  ]
+}
