@@ -39,7 +39,7 @@ MCP-NixOS is a Model Context Protocol (MCP) server that provides accurate, real-
 
 ## Key Architecture
 
-The project is an async Rust server on the official `rmcp` SDK, speaking MCP revision **2026-07-28** over **stdio only**. `server.rs` handles the protocol surface and routing, `sources/` contains per-source implementations, `http.rs` is the single path to upstreams, and `caches.rs` manages cached data.
+The project is an async Rust server on the official `rmcp` SDK, speaking MCP revisions **2026-07-28** and **2025-11-25** over **stdio only**. `server.rs` handles the protocol surface and routing, `sources/` contains per-source implementations, `http.rs` is the single path to upstreams, and `caches.rs` manages cached data.
 
 Only **2 MCP tools** are exposed (consolidated from 17 in v1.0):
 - `nix` - Unified query tool for search/info/stats/browse/channels/flake-inputs/cache/store across all sources. `options` is accepted as a silent alias for `browse` (legacy).
@@ -134,7 +134,7 @@ cargo test noogle                         # Tests matching a pattern
 1. **Channel Resolution**: The server dynamically discovers available NixOS channels. "stable" always maps to the current stable release. Fallback mappings are never memoized.
 2. **Error Handling**: All tools return helpful plain text error messages. API failures gracefully degrade.
 3. **Process-local Caching**: There is no persistent cache or database. Catalogue-style sources such as Home Manager, nix-darwin, Nixvim, NVF, Noogle, and nix.dev are cached in memory for the lifetime of the server process; other queries hit live APIs. These hold upstream data, never client state.
-4. **Stateless Protocol**: Only revision 2026-07-28 is supported. There is no `initialize` handshake: `initialize` is rejected with `-32022` naming the supported versions. To serve a legacy client, add its version to `SUPPORTED_VERSIONS` in `server.rs`.
+4. **Protocol Versions**: Native 2026-07-28 requests carry their own metadata. The SDK also negotiates 2025-11-25 sessions for existing Codex, Claude, OMP and MemoryCreep clients. Both use the same handlers; do not add a separate tool loop or translation process. Remove the older revision only after those named consumers migrate and their protocol checks pass.
 5. **Plain Text Output**: All responses are formatted as human-readable plain text. Never return raw JSON or XML to users.
 6. **Bounded Work**: Response bodies are capped in `http.rs`. Tool calls run in their own task, so `notifications/cancelled` aborts in-flight HTTP and `nix` children. HTML parsing and file I/O run off the async workers.
 7. **Environment Variables**: `MCP_NIXOS_UPSTREAM` redirects all upstream traffic to `<url>/<host>/<path>`, for offline testing.

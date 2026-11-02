@@ -11,7 +11,7 @@ const HELP: &str = "mcp-nixos - MCP server for NixOS, Home Manager, and nix-darw
 
 Usage: mcp-nixos [--help | --version]
 
-Speaks MCP revision 2026-07-28 over stdin/stdout. Exits when stdin closes.";
+Speaks MCP revisions 2026-07-28 and 2025-11-25 over stdin/stdout. Exits when stdin closes.";
 
 async fn serve() -> Result<(), Box<dyn std::error::Error>> {
     let http = Http::from_env()?;

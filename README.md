@@ -13,8 +13,10 @@
 
 **🚨 No Nix/NixOS Required!** One binary, no language runtime. You're just querying APIs.
 
-MCP-NixOS speaks MCP revision **2026-07-28** over **stdio**: stateless, no `initialize` handshake,
-no sessions. Your client must support that revision.
+MCP-NixOS speaks MCP revision **2026-07-28** over **stdio**, with self-contained
+requests and no `initialize` handshake. Existing Codex, Claude, OMP and MemoryCreep
+clients can instead negotiate **2025-11-25** through the SDK's standard handshake.
+Both protocols use the same Rust tool implementation; no Python runtime or bridge is required.
 
 ### Option 1: Nix
 

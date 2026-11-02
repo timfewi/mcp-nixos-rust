@@ -1,8 +1,8 @@
 //! MCP tools, tool routing and the protocol surface.
 //!
-//! Stateless by construction: the only protocol revision is 2026-07-28, every
-//! request carries its own metadata, and no state is keyed to a client. Caches
-//! in [`crate::App`] hold upstream catalogues, which any request may reuse.
+//! Native 2026-07-28 requests carry their own metadata. The SDK also negotiates
+//! 2025-11-25 sessions for existing Codex, Claude, OMP and MemoryCreep clients.
+//! Caches in [`crate::App`] hold upstream catalogues, never client state.
 
 use std::borrow::Cow;
 use std::sync::{Arc, LazyLock};
@@ -45,7 +45,7 @@ const NIX_VERSIONS_SCHEMA: &str = include_str!("nix_versions_schema.json");
 /// The tool catalogue is compiled in, so clients may cache it for a day.
 const TOOL_LIST_TTL_MS: u64 = 86_400_000;
 
-const SUPPORTED_VERSIONS: &[ProtocolVersion] = &[ProtocolVersion::V_2026_07_28];
+const SUPPORTED_VERSIONS: &[ProtocolVersion] = &[ProtocolVersion::V_2026_07_28, ProtocolVersion::V_2025_11_25];
 
 fn default_source() -> String {
     "nixos".to_owned()

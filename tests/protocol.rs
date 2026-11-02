@@ -1,4 +1,4 @@
-//! Black-box tests of the 2026-07-28 stdio protocol surface.
+//! Black-box tests of native 2026-07-28 and configured-client 2025-11-25 stdio.
 
 #![allow(clippy::unwrap_used)]
 
@@ -79,7 +79,7 @@ fn discover_needs_no_handshake_and_identifies_the_server() {
     let mut server = Server::spawn(&fixture.url);
     let result = server.request(1, "server/discover", json!({}))["result"].clone();
     assert_eq!(result["resultType"], "complete");
-    assert_eq!(result["supportedVersions"], json!(["2026-07-28"]));
+    assert_eq!(result["supportedVersions"], json!(["2026-07-28", "2025-11-25"]));
     assert_eq!(result["capabilities"], json!({"tools": {}}));
     assert_eq!(result["cacheScope"], "public");
     assert!(result["ttlMs"].as_u64().unwrap() > 0);
@@ -124,19 +124,35 @@ fn unsupported_versions_are_rejected_with_the_supported_list() {
     server.send(json!({"jsonrpc": "2.0", "id": 1, "method": "tools/list", "params": {"_meta": stale}}));
     let reply = server.receive();
     assert_eq!(reply["error"]["code"], -32022);
-    assert_eq!(reply["error"]["data"]["supported"], json!(["2026-07-28"]));
+    assert_eq!(reply["error"]["data"]["supported"], json!(["2026-07-28", "2025-11-25"]));
 }
 
 #[test]
-fn legacy_handshake_fails_with_a_diagnostic() {
+fn legacy_handshake_serves_configured_clients() {
     let fixture = offline();
     let mut server = Server::spawn(&fixture.url);
     server.send(json!({"jsonrpc": "2.0", "id": 1, "method": "initialize", "params": {
         "protocolVersion": "2025-11-25", "capabilities": {}, "clientInfo": {"name": "old", "version": "0"}
     }}));
     let reply = server.receive();
-    assert_eq!(reply["error"]["code"], -32022, "{reply}");
-    assert_eq!(reply["error"]["data"]["supported"], json!(["2026-07-28"]));
+    assert_eq!(reply["result"]["protocolVersion"], "2025-11-25", "{reply}");
+    assert_eq!(reply["result"]["serverInfo"]["name"], "mcp-nixos");
+    assert_eq!(reply["result"]["capabilities"], json!({"tools": {}}));
+    server.send(json!({"jsonrpc": "2.0", "method": "notifications/initialized"}));
+
+    // Session clients send neither the 2026 protocol metadata nor discovery.
+    server.send(json!({"jsonrpc": "2.0", "id": "catalogue", "method": "tools/list", "params": {}}));
+    let reply = server.receive();
+    assert_eq!(reply["id"], "catalogue");
+    let tools = reply["result"]["tools"].as_array().unwrap();
+    assert_eq!(tools.iter().map(|tool| tool["name"].as_str().unwrap()).collect::<Vec<_>>(), ["nix", "nix_versions"]);
+    server.send(json!({"jsonrpc": "2.0", "id": 3, "method": "tools/call", "params": {
+        "name": "nix", "arguments": {"action": "stats", "source": "wiki"}
+    }}));
+    let reply = server.receive();
+    assert_eq!(reply["id"], 3);
+    assert_eq!(reply["result"]["content"][0]["text"], "Error (ERROR): Stats not available for source=wiki.");
+    assert_eq!(fixture.count("wiki"), 0, "local validation must not make an upstream request");
 }
 
 #[test]
