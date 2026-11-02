@@ -14,9 +14,9 @@
 **🚨 No Nix/NixOS Required!** One binary, no language runtime. You're just querying APIs.
 
 MCP-NixOS speaks MCP revision **2026-07-28** over **stdio**, with self-contained
-requests and no `initialize` handshake. Existing Codex, Claude, OMP and MemoryCreep
-clients can instead negotiate **2025-11-25** through the SDK's standard handshake.
-Both protocols use the same Rust tool implementation; no Python runtime or bridge is required.
+requests and no `initialize` handshake. Clients that still use the session-based
+**2025-11-25** revision negotiate it through the SDK's standard handshake. Both
+protocols use the same Rust tool implementation; no Python runtime or bridge is required.
 
 ### Option 1: Nix
 
@@ -108,6 +108,46 @@ An MCP server providing accurate, real-time information about:
 - **Package versions** - Historical versions with commit hashes via [NixHub.io](https://www.nixhub.io)
 - **Binary cache status** - Check if packages are cached on cache.nixos.org with download sizes
 - **Local flake inputs** - Explore your pinned flake dependencies directly from the Nix store (requires Nix)
+
+## Why Rust?
+
+Version 3.1 replaces the Python/FastMCP server with a native Rust server on the
+official `rmcp` SDK. The tool surface (`nix`, `nix_versions`) and its answers
+stay the same; what changes is everything around them:
+
+- **Startup is no longer the bottleneck.** Most MCP clients spawn one server per
+  session. The Python server spent almost a second importing its runtime before
+  it could answer `initialize`; the Rust binary answers in a few milliseconds,
+  so the tool is ready before the model's first turn.
+- **One binary instead of a Python environment.** No interpreter, virtualenv or
+  pinned FastMCP/MCP SDK pair to keep compatible. The FastMCP 3 → 4 and MCP SDK
+  1 → 2 transitions changed the wire protocol underneath the server; in Rust both
+  protocol revisions are served by one SDK and one set of handlers.
+- **Lower memory.** A coding session keeps the server alive for its whole
+  lifetime; after the handshake it now needs about a tenth of the former memory.
+- **Fewer failure modes at launch.** Problems such as the former import-time
+  `.env` parsing crash (2.4.2) cannot occur: nothing is read from the working
+  directory at startup.
+- **Bounded, offline-testable I/O.** All upstream traffic goes through one HTTP
+  path with size caps and timeouts, and the full test suite runs offline against
+  local fixtures.
+
+### Benchmark
+
+Spawn the server, send `initialize` (2025-11-25), `notifications/initialized` and
+`tools/list`, then close stdin. 20 sequential runs per build after one warm-up,
+x86_64-linux, 8 CPUs, no network access needed. Medians:
+
+| Build | `initialize` ready | `tools/list` | RSS after handshake | Runtime closure |
+| ----- | ------------------ | ------------ | ------------------- | --------------- |
+| 3.0.2 Python / FastMCP 3 | 920 ms (863–955) | 2.66 ms | 92 MiB | 328 MiB, 107 store paths |
+| 3.1.0 Rust / rmcp | **2.5 ms** (2.2–3.2) | **0.24 ms** | **8.6 MiB** | **60 MiB**, 7 store paths |
+| Improvement | ~370× faster | ~11× faster | ~11× less | ~5.5× smaller |
+
+The Rust closure is dominated by glibc and the GCC runtime library shared with
+the rest of the system; the binary itself is 14 MiB. Query latency for real
+lookups is bounded by the upstream APIs (search.nixos.org, NixHub, FlakeHub …)
+and is not part of this measurement.
 
 ## The Tools
 
