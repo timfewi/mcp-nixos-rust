@@ -47,7 +47,7 @@
 
           meta = {
             inherit (manifest.package) description;
-            homepage = "https://github.com/utensils/mcp-nixos";
+            homepage = "https://github.com/timfewi/mcp-nixos-rust";
             license = pkgs.lib.licenses.mit;
             mainProgram = "mcp-nixos";
           };
@@ -135,7 +135,7 @@
             default = mcp-nixos;
 
             docker = pkgs.dockerTools.buildLayeredImage {
-              name = "ghcr.io/utensils/mcp-nixos";
+              name = "ghcr.io/timfewi/mcp-nixos-rust";
               tag = mcp-nixos.version;
               # Format: YYYYMMDDHHMMSS -> YYYY-MM-DDTHH:MM:SSZ
               created =

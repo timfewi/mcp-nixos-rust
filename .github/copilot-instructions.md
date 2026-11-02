@@ -36,9 +36,8 @@ build                    # cargo build --release
 ## CI/CD & Release Process
 
 - **CI runs on all PRs:** flake check, Nix build, clippy, rustfmt, tests
-- **Automated releases:** Release Please creates the version tag and GitHub Release; the authenticated release event publishes Docker images and FlakeHub
+- **Releases:** no registry publishing; consumers pin the flake from `github:timfewi/mcp-nixos-rust`
 - **Commit convention:** `type: summary` format (feat:, fix:, docs:, refactor:, test:, chore:)
-- **Use `/release` command:** Review and merge the generated release PR, then verify every registry; do not bump versions or create tags manually
 
 ## Common Pitfalls
 

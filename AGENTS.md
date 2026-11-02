@@ -102,7 +102,7 @@ cargo test noogle                         # Tests matching a pattern
 ```nix
 # In your flake.nix
 {
-  inputs.mcp-nixos.url = "github:utensils/mcp-nixos";
+  inputs.mcp-nixos.url = "github:timfewi/mcp-nixos-rust";
 
   outputs = { nixpkgs, mcp-nixos, ... }: {
     # Use the overlay to add pkgs.mcp-nixos
@@ -123,7 +123,7 @@ cargo test noogle                         # Tests matching a pattern
     "nixos": {
       "type": "stdio",
       "command": "nix",
-      "args": ["run", "github:utensils/mcp-nixos"]
+      "args": ["run", "github:timfewi/mcp-nixos-rust"]
     }
   }
 }
@@ -148,6 +148,4 @@ cargo test noogle                         # Tests matching a pattern
 
 - Commit messages follow `type: summary` (e.g., `feat:`, `fix:`, `docs:`, `refactor:`, `test:`, `chore:`).
 - **CI**: Runs on all PRs - flake check, Nix build, clippy, rustfmt, tests.
-- **Publish**: Release Please creates tags and GitHub Releases; the authenticated release event then publishes multi-arch Docker images to GHCR and Docker Hub, and the tagged flake to FlakeHub.
-- **Release Process**: Use the `/release` command to review and merge the generated `release: vX.Y.Z` PR and verify every public registry. Do not bump versions or create tags manually.
-- Release PRs update `Cargo.toml`, `Cargo.lock`, `.release-please-manifest.json`, and `RELEASE_NOTES.md`; their squash merge message is `release: vX.Y.Z`.
+- **Releases**: This fork publishes no registry artifacts (no Docker images, FlakeHub or website deployment). Consumers pin the flake from `github:timfewi/mcp-nixos-rust`. Bump `Cargo.toml`/`Cargo.lock` and `RELEASE_NOTES.md` together when changing the version.

@@ -94,8 +94,8 @@ Light and dark modes are both supported out of the box (VitePress handles the to
 
 ## Deployment
 
-The `deploy-website.yml` GitHub Actions workflow builds on push to `main` (when anything
-under `website/` changes) and syncs `website/out/` to S3, then invalidates CloudFront.
+This fork does not deploy the site. Build it locally with the `web` dev shell and
+serve `website/out/` if needed.
 
 ## Editing Content
 

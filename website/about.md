@@ -31,10 +31,10 @@ compatible with Claude, Cursor, and every other client that speaks MCP. The proj
 designed to be fast, reliable, and cross-platform — Linux, macOS, or Windows, no Nix
 required to run.
 
-::: tip A Utensils Creation
-MCP-NixOS is developed and maintained by
-[Utensils](https://utensils.io), an organization focused on building high-quality tools
-and utilities for developers and systems engineers.
+::: tip Origin
+MCP-NixOS was created by [Utensils](https://utensils.io) as a Python server
+([utensils/mcp-nixos](https://github.com/utensils/mcp-nixos)). This fork is its
+Rust rewrite.
 :::
 
 ## Architecture
@@ -160,10 +160,9 @@ PR — flake check, Nix build, clippy, rustfmt, and tests.
 
 <div style="display: flex; flex-wrap: wrap; gap: 0.75rem; margin: 1.5rem 0;">
 
-[GitHub Repository](https://github.com/utensils/mcp-nixos){.vp-button.vp-button-brand}
-[Report Issues](https://github.com/utensils/mcp-nixos/issues){.vp-button.vp-button-alt}
-[Code Coverage](https://codecov.io/gh/utensils/mcp-nixos){.vp-button.vp-button-alt}
-[Release Notes](https://github.com/utensils/mcp-nixos/blob/main/RELEASE_NOTES.md){.vp-button.vp-button-alt}
+[GitHub Repository](https://github.com/timfewi/mcp-nixos-rust){.vp-button.vp-button-brand}
+[Report Issues](https://github.com/timfewi/mcp-nixos-rust/issues){.vp-button.vp-button-alt}
+[Release Notes](https://github.com/timfewi/mcp-nixos-rust/blob/main/RELEASE_NOTES.md){.vp-button.vp-button-alt}
 
 </div>
 

@@ -31,7 +31,7 @@ And you know what? You might be right.
   "mcpServers": {
     "nixos": {
       "command": "nix",
-      "args": ["run", "github:utensils/mcp-nixos", "--"]
+      "args": ["run", "github:timfewi/mcp-nixos-rust", "--"]
     }
   }
 }
@@ -39,7 +39,7 @@ And you know what? You might be right.
 
 </UsageOption>
 
-### Option 2b: Declarative Nix {#option-2b-declarative-nix}
+### Option 2: Declarative Nix {#option-2-declarative-nix}
 
 <UsageOption title="The true Nix way" alt note="Finally, a package that slots into your 3,000-line flake.nix without drama.">
 
@@ -62,7 +62,7 @@ Or consume the flake directly via the provided overlay:
 ```nix
 # flake.nix
 {
-  inputs.mcp-nixos.url = "github:utensils/mcp-nixos";
+  inputs.mcp-nixos.url = "github:timfewi/mcp-nixos-rust";
 
   outputs = { nixpkgs, mcp-nixos, ... }: {
     nixpkgs.overlays = [ mcp-nixos.overlays.default ];
@@ -75,37 +75,12 @@ Or consume the flake directly via the provided overlay:
 
 </UsageOption>
 
-### Option 2: Docker {#option-2-docker}
-
-<UsageOption title="Container enthusiasts unite" note="A container for one small binary. But hey, it's &quot;isolated&quot;!">
-
-Because why install software directly when you can wrap it in 17 layers of abstraction?
-At least it's reproducible. Probably.
-
-```json
-{
-  "mcpServers": {
-    "nixos": {
-      "command": "docker",
-      "args": ["run", "--rm", "-i", "ghcr.io/utensils/mcp-nixos"]
-    }
-  }
-}
-```
-
-Multi-arch images (amd64 + arm64) on both GHCR and Docker Hub:
-
-- `ghcr.io/utensils/mcp-nixos`
-- `utensils/mcp-nixos`
-
-</UsageOption>
-
 ### Option 3: Cargo {#option-3-cargo}
 
 <UsageOption title="For Rust people" alt note="One binary, no runtime, no virtualenv archaeology.">
 
 ```bash
-cargo install --git https://github.com/utensils/mcp-nixos
+cargo install --git https://github.com/timfewi/mcp-nixos-rust
 ```
 
 ```json

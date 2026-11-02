@@ -17,7 +17,7 @@ hero:
       link: /usage
     - theme: alt
       text: View on GitHub
-      link: https://github.com/utensils/mcp-nixos
+      link: https://github.com/timfewi/mcp-nixos-rust
     - theme: alt
       text: What is this?
       link: /about
@@ -62,7 +62,7 @@ features:
 ---
 
 <div style="text-align: center; margin-top: 3rem;">
-  <a href="https://github.com/utensils/mcp-nixos/releases/latest" class="pill" target="_blank" rel="noopener">Latest release ↗</a>
+  <a href="https://github.com/timfewi/mcp-nixos-rust/releases/latest" class="pill" target="_blank" rel="noopener">Latest release ↗</a>
   <span class="pill">2 MCP tools</span>
   <span class="pill">Plain text responses</span>
   <span class="pill">MIT</span>
@@ -77,7 +77,7 @@ Paste this into your MCP client config. Congratulations, you now have access to 
   "mcpServers": {
     "nixos": {
       "command": "nix",
-      "args": ["run", "github:utensils/mcp-nixos", "--"]
+      "args": ["run", "github:timfewi/mcp-nixos-rust", "--"]
     }
   }
 }

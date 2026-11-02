@@ -37,7 +37,6 @@ export default defineConfig({
     ],
     ['meta', { property: 'og:image', content: `${siteUrl}/images/og-image.png` }],
     ['meta', { name: 'twitter:card', content: 'summary_large_image' }],
-    ['meta', { name: 'twitter:creator', content: '@utensils_io' }],
     ['meta', { name: 'twitter:image', content: `${siteUrl}/images/og-image.png` }],
   ],
 
@@ -51,9 +50,8 @@ export default defineConfig({
       {
         text: 'Resources',
         items: [
-          { text: 'GitHub', link: 'https://github.com/utensils/mcp-nixos' },
-          { text: 'FlakeHub', link: 'https://flakehub.com/flake/utensils/mcp-nixos' },
-          { text: 'Docker Hub', link: 'https://hub.docker.com/r/utensils/mcp-nixos' },
+          { text: 'GitHub', link: 'https://github.com/timfewi/mcp-nixos-rust' },
+          { text: 'Original Python server', link: 'https://github.com/utensils/mcp-nixos' },
         ],
       },
     ],
@@ -65,8 +63,7 @@ export default defineConfig({
           items: [
             { text: 'Pick Your Poison', link: '/usage#pick-your-poison' },
             { text: 'Nix', link: '/usage#option-1-nix' },
-            { text: 'Declarative Nix', link: '/usage#option-2b-declarative-nix' },
-            { text: 'Docker', link: '/usage#option-2-docker' },
+            { text: 'Declarative Nix', link: '/usage#option-2-declarative-nix' },
             { text: 'Cargo', link: '/usage#option-3-cargo' },
             { text: 'Pi Coding Agent', link: '/usage#option-4-pi-coding-agent' },
           ],
@@ -103,18 +100,17 @@ export default defineConfig({
     },
 
     socialLinks: [
-      { icon: 'github', link: 'https://github.com/utensils/mcp-nixos' },
-      { icon: 'twitter', link: 'https://twitter.com/utensils_io' },
+      { icon: 'github', link: 'https://github.com/timfewi/mcp-nixos-rust' },
     ],
 
     editLink: {
-      pattern: 'https://github.com/utensils/mcp-nixos/edit/main/website/:path',
+      pattern: 'https://github.com/timfewi/mcp-nixos-rust/edit/main/website/:path',
       text: 'Edit this page on GitHub',
     },
 
     footer: {
       message:
-        'Released under the MIT License. A <a href="https://utensils.io" target="_blank" rel="noopener">Utensils</a> creation.',
+        'Released under the MIT License. Rust fork of <a href="https://github.com/utensils/mcp-nixos" target="_blank" rel="noopener">utensils/mcp-nixos</a>.',
       copyright: `© 2024–${new Date().getFullYear()} MCP-NixOS contributors.`,
     },
 
