@@ -1,12 +1,6 @@
 # MCP-NixOS - Because Your AI Shouldn't Hallucinate Package Names
 
-[![MCP Toplist](https://mcptoplist.com/badge/glama%2Futensils%2Fmcp-nixos.svg)](https://mcptoplist.com/server/glama%2Futensils%2Fmcp-nixos)
-
-[![CI](https://github.com/utensils/mcp-nixos/actions/workflows/ci.yml/badge.svg)](https://github.com/utensils/mcp-nixos/actions/workflows/ci.yml)
-[![codecov](https://codecov.io/gh/utensils/mcp-nixos/graph/badge.svg?token=kdcbgvq4Bh)](https://codecov.io/gh/utensils/mcp-nixos)
-[![FlakeHub](https://img.shields.io/endpoint?url=https://flakehub.com/f/utensils/mcp-nixos/badge)](https://flakehub.com/flake/utensils/mcp-nixos)
 [![Rust](https://img.shields.io/badge/rust-2024-blue.svg)](https://www.rust-lang.org/)
-![CodeRabbit Pull Request Reviews](https://img.shields.io/coderabbit/prs/github/utensils/mcp-nixos?utm_source=oss&utm_medium=github&utm_campaign=utensils%2Fmcp-nixos&labelColor=171717&color=FF570A&link=https%3A%2F%2Fcoderabbit.ai&label=CodeRabbit+Reviews)
 [![Built with Claude](https://img.shields.io/badge/Built%20with-Claude-D97757?logo=claude&logoColor=white)](https://claude.ai)
 
 ## Quick Start
@@ -20,29 +14,14 @@ protocols use the same Rust tool implementation; no Python runtime or bridge is 
 
 ### Option 1: Nix
 
-[![Install MCP Server](https://cursor.com/deeplink/mcp-install-dark.svg)](https://cursor.com/install-mcp?name=nixos&config=eyJjb21tYW5kIjoibml4IHJ1biBnaXRodWI6dXRlbnNpbHMvbWNwLW5peG9zIC0tIn0%3D)
+[![Install MCP Server](https://cursor.com/deeplink/mcp-install-dark.svg)](https://cursor.com/install-mcp?name=nixos&config=eyJjb21tYW5kIjoibml4IHJ1biBnaXRodWI6dGltZmV3aS9tY3Atbml4b3MtcnVzdCAtLSJ9)
 
 ```json
 {
   "mcpServers": {
     "nixos": {
       "command": "nix",
-      "args": ["run", "github:utensils/mcp-nixos", "--"]
-    }
-  }
-}
-```
-
-### Option 2: Docker
-
-[![Install MCP Server](https://cursor.com/deeplink/mcp-install-dark.svg)](https://cursor.com/install-mcp?name=nixos&config=eyJjb21tYW5kIjoiZG9ja2VyIiwiYXJncyI6WyJydW4iLCItLXJtIiwiLWkiLCJnaGNyLmlvL3V0ZW5zaWxzL21jcC1uaXhvcyJdfQ%3D%3D)
-
-```json
-{
-  "mcpServers": {
-    "nixos": {
-      "command": "docker",
-      "args": ["run", "--rm", "-i", "ghcr.io/utensils/mcp-nixos"]
+      "args": ["run", "github:timfewi/mcp-nixos-rust", "--"]
     }
   }
 }
@@ -50,10 +29,10 @@ protocols use the same Rust tool implementation; no Python runtime or bridge is 
 
 Your AI now has access to real NixOS data instead of making things up. You're welcome.
 
-### Option 3: Cargo
+### Option 2: Cargo
 
 ```bash
-cargo install --git https://github.com/utensils/mcp-nixos
+cargo install --git https://github.com/timfewi/mcp-nixos-rust
 ```
 
 ```json
@@ -66,7 +45,7 @@ cargo install --git https://github.com/utensils/mcp-nixos
 }
 ```
 
-### Option 4: Pi Coding Agent
+### Option 3: Pi Coding Agent
 
 [Pi](https://www.npmjs.com/package/@mariozechner/pi-coding-agent) does not speak MCP natively. Two supported paths:
 
@@ -307,19 +286,21 @@ nix_versions(package="nodejs", version="20.0.0")
 **You DON'T need Nix installed.** The server is a single binary:
 
 ```bash
-cargo install --git https://github.com/utensils/mcp-nixos
+cargo install --git https://github.com/timfewi/mcp-nixos-rust
 ```
 
 For Nix users:
 
 ```bash
-nix run github:utensils/mcp-nixos
-nix profile install github:utensils/mcp-nixos
+nix run github:timfewi/mcp-nixos-rust
+nix profile install github:timfewi/mcp-nixos-rust
 ```
 
 ### Declarative Installation (NixOS / Home Manager / nix-darwin)
 
-mcp-nixos is available in [nixpkgs](https://search.nixos.org/packages?channel=unstable&show=mcp-nixos&query=mcp-nixos):
+The `mcp-nixos` package in [nixpkgs](https://search.nixos.org/packages?channel=unstable&show=mcp-nixos&query=mcp-nixos)
+is the upstream Python server, not this Rust rewrite. Use it only if you want the
+Python version:
 
 ```nix
 # NixOS (configuration.nix)
@@ -339,7 +320,7 @@ Or use the flake directly with the provided overlay:
 {
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
-    mcp-nixos.url = "github:utensils/mcp-nixos";
+    mcp-nixos.url = "github:timfewi/mcp-nixos-rust";
   };
 
   outputs = { self, nixpkgs, mcp-nixos, ... }: {
@@ -380,6 +361,7 @@ cargo fmt            # Format
 
 ## Acknowledgments
 
+- **[utensils/mcp-nixos](https://github.com/utensils/mcp-nixos)** - The original Python server this Rust rewrite is forked from
 - **[NixHub.io](https://www.nixhub.io)** - Package version history
 - **[search.nixos.org](https://search.nixos.org)** - Official NixOS search
 - **[FlakeHub](https://flakehub.com)** - Flake registry by Determinate Systems
